@@ -11,7 +11,7 @@ export interface Activity {
 
 export const ACTIVITIES: Activity[] = [
   {
-    id: 'activity-1',
+    id: 'activity-paragliding',
     title: 'Paragliding Interlaken',
     description: 'Fly over the stunning Swiss Alps with a certified instructor. Panoramic views of Eiger, Mönch & Jungfrau.',
     location: 'Interlaken',
@@ -21,7 +21,7 @@ export const ACTIVITIES: Activity[] = [
     duration: '2h',
   },
   {
-    id: 'activity-2',
+    id: 'activity-eiger-trail',
     title: 'Eiger Trail Hike',
     description: 'Classic mountain hike along the base of the Eiger north face. Stunning alpine scenery.',
     location: 'Grindelwald',
@@ -31,7 +31,7 @@ export const ACTIVITIES: Activity[] = [
     duration: '4h',
   },
   {
-    id: 'activity-3',
+    id: 'activity-glacier-walk',
     title: 'Grindelwald Glacier Walk',
     description: 'Walk alongside the retreating Grindelwald glacier and learn about climate change.',
     location: 'Grindelwald',
@@ -41,7 +41,7 @@ export const ACTIVITIES: Activity[] = [
     duration: '3h',
   },
   {
-    id: 'activity-4',
+    id: 'activity-boat-tour',
     title: 'Lake Thun Boat Tour',
     description: 'Cruise across the turquoise Lake Thun with stops at Spiez and Oberhofen castle.',
     location: 'Thun',
