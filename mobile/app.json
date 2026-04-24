@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#1A5276"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.jungfraupass.app",
@@ -26,7 +28,10 @@
         "backgroundColor": "#1A5276"
       },
       "package": "com.jungfraupass.app",
-      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION"]
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -35,7 +40,13 @@
     "plugins": [
       "expo-router",
       "expo-camera",
-      ["expo-location", { "locationAlwaysAndWhenInUsePermission": "Allow JungfrauPass to use your location." }]
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow JungfrauPass to use your location."
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 
 export interface Transaction {
   id: string;
@@ -21,19 +20,19 @@ export function useTransactions(userId: string | null) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || !FIREBASE_CONFIGURED || !db) {
       setLoading(false);
       return;
     }
+    const { collection, query, where, orderBy, onSnapshot, limit } = require('firebase/firestore');
     const q = query(
       collection(db, 'transactions'),
       where('fromUserId', '==', userId),
       orderBy('timestamp', 'desc'),
       limit(20)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const txs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Transaction));
-      setTransactions(txs);
+    const unsub = onSnapshot(q, (snap: any) => {
+      setTransactions(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Transaction)));
       setLoading(false);
     });
     return unsub;
@@ -47,19 +46,19 @@ export function usePartnerTransactions(partnerId: string | null) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!partnerId) {
+    if (!partnerId || !FIREBASE_CONFIGURED || !db) {
       setLoading(false);
       return;
     }
+    const { collection, query, where, orderBy, onSnapshot, limit } = require('firebase/firestore');
     const q = query(
       collection(db, 'transactions'),
       where('toPartnerId', '==', partnerId),
       orderBy('timestamp', 'desc'),
       limit(50)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const txs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Transaction));
-      setTransactions(txs);
+    const unsub = onSnapshot(q, (snap: any) => {
+      setTransactions(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Transaction)));
       setLoading(false);
     });
     return unsub;
