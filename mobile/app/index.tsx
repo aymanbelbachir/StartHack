@@ -12,11 +12,10 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Colors } from '@/constants/Colors';
 import { Button } from '@/components/Button';
 import { HOTEL_CODES } from '@/data/landmarks';
+import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 
 export default function ActivationScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -37,17 +36,32 @@ export default function ActivationScreen() {
     }
     setLoading(true);
     try {
-      const docRef = await addDoc(collection(db, 'users'), {
+      const walletData = {
         name,
         email,
         hotelCode: hotelCode.toUpperCase(),
         tokenBalance: 50,
         pointsBalance: 0,
         checkInLocation: hotelCode.replace('HOTEL-', '') + ' Hotel',
-        activatedAt: serverTimestamp(),
-      });
-      await AsyncStorage.setItem('userId', docRef.id);
+      };
+
+      let userId: string;
+
+      if (FIREBASE_CONFIGURED && db) {
+        const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+        const docRef = await addDoc(collection(db, 'users'), {
+          ...walletData,
+          activatedAt: serverTimestamp(),
+        });
+        userId = docRef.id;
+      } else {
+        userId = `local-${Date.now()}`;
+      }
+
+      await AsyncStorage.setItem('userId', userId);
       await AsyncStorage.setItem('role', 'guest');
+      await AsyncStorage.setItem('wallet_data', JSON.stringify(walletData));
+      await AsyncStorage.setItem('transactions', JSON.stringify([]));
       router.replace('/(guest)');
     } catch {
       Alert.alert('Error', 'Activation failed. Please try again.');

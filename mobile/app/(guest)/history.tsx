@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView, Text, StyleSheet, useColorScheme, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/Colors';
 import { TransactionItem } from '@/components/TransactionItem';
@@ -9,11 +10,16 @@ export default function HistoryScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [userId, setUserId] = useState<string | null>(null);
-  const { transactions, loading } = useTransactions(userId);
+  const { transactions, loading, refresh } = useTransactions(userId);
 
-  useEffect(() => {
-    AsyncStorage.getItem('userId').then(setUserId);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem('userId').then((id) => {
+        setUserId(id);
+        if (id) refresh();
+      });
+    }, [refresh])
+  );
 
   if (loading) {
     return (

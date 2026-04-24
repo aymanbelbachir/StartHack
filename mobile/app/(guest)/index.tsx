@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, useColorScheme, TouchableOpacity } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/Colors';
 import { WalletCard } from '@/components/WalletCard';
@@ -11,11 +11,16 @@ export default function WalletScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [userId, setUserId] = useState<string | null>(null);
-  const { wallet, loading } = useWallet(userId);
+  const { wallet, loading, refresh } = useWallet(userId);
 
-  useEffect(() => {
-    AsyncStorage.getItem('userId').then(setUserId);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem('userId').then((id) => {
+        setUserId(id);
+        if (id) refresh();
+      });
+    }, [refresh])
+  );
 
   if (loading) {
     return (

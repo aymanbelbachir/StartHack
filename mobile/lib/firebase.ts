@@ -1,6 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -14,12 +13,10 @@ const firebaseConfig = {
 export const FIREBASE_CONFIGURED = !!firebaseConfig.projectId;
 
 let db: ReturnType<typeof getFirestore> | null = null;
-let auth: ReturnType<typeof getAuth> | null = null;
 
 if (FIREBASE_CONFIGURED) {
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   db = getFirestore(app);
-  auth = getAuth(app);
 }
 
-export { db, auth };
+export { db };
