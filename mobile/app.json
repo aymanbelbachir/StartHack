@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "StartHack",
-    "slug": "starthack",
+    "name": "JungfrauPass",
+    "slug": "jungfraupass",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,29 +9,37 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#6C63FF"
+      "backgroundColor": "#1A5276"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.starthack.app"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.jungfraupass.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to scan partner QR codes for payments and benefit redemptions.",
+        "NSLocationWhenInUseUsageDescription": "Used to check in at landmarks and earn discovery points."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#6C63FF"
+        "backgroundColor": "#1A5276"
       },
-      "package": "com.starthack.app"
+      "package": "com.jungfraupass.app",
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION"]
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/favicon.png"
+      "output": "static"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      ["expo-location", { "locationAlwaysAndWhenInUsePermission": "Allow JungfrauPass to use your location." }]
+    ],
     "experiments": {
       "typedRoutes": true
     },
-    "scheme": "starthack"
+    "scheme": "jungfraupass"
   }
 }

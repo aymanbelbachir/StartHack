@@ -35,7 +35,7 @@ export function Button({
   const buttonStyles = [
     styles.base,
     variant === 'primary' && { backgroundColor: colors.primary },
-    variant === 'secondary' && { backgroundColor: colors.secondary },
+    variant === 'secondary' && { backgroundColor: colors.accent },
     variant === 'outline' && {
       backgroundColor: 'transparent',
       borderWidth: 2,
