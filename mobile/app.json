@@ -19,6 +19,7 @@
       "bundleIdentifier": "com.jungfraupass.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Used to scan partner QR codes for payments and benefit redemptions.",
+        "NSPhotoLibraryUsageDescription": "Used to pick a QR code image from your photo library.",
         "NSLocationWhenInUseUsageDescription": "Used to check in at landmarks and earn discovery points."
       }
     },
@@ -30,6 +31,8 @@
       "package": "com.jungfraupass.app",
       "permissions": [
         "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
         "ACCESS_FINE_LOCATION"
       ]
     },
@@ -40,6 +43,7 @@
     "plugins": [
       "expo-router",
       "expo-camera",
+      "expo-image-picker",
       [
         "expo-location",
         {

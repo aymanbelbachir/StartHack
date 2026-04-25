@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import type { Activity } from '@/data/activities';
 
 interface ActivityCardProps {
@@ -20,8 +20,14 @@ export function ActivityCard({ activity, registered = false, onRegister }: Activ
 
   return (
     <View style={styles.card}>
-      <View style={[styles.hero, { backgroundColor: heroBg }]}>
-        <Text style={styles.heroEmoji}>{activity.imageEmoji}</Text>
+      <View style={styles.heroWrap}>
+        {activity.imageUrl ? (
+          <Image source={{ uri: activity.imageUrl }} style={styles.heroImg} resizeMode="cover" />
+        ) : (
+          <View style={[styles.heroFallback, { backgroundColor: heroBg }]}>
+            <Text style={styles.heroEmoji}>{activity.imageEmoji}</Text>
+          </View>
+        )}
         <View style={styles.catBadge}>
           <Text style={styles.catText}>{activity.category}</Text>
         </View>
@@ -67,11 +73,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF', borderRadius: 24, overflow: 'hidden', marginBottom: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3,
   },
-  hero: { height: 144, alignItems: 'center', justifyContent: 'center' },
+  heroWrap: { height: 144, overflow: 'hidden' },
+  heroImg: { width: '100%', height: '100%' },
+  heroFallback: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   heroEmoji: { fontSize: 54 },
   catBadge: {
     position: 'absolute', bottom: 10, left: 12,
-    backgroundColor: 'rgba(0,0,0,0.28)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
   },
   catText: { fontSize: 11, color: '#FFFFFF', fontWeight: '600' },
   content: { padding: 16, gap: 12 },

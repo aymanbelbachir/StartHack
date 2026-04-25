@@ -82,7 +82,7 @@ export default function GuestLayout() {
       />
       <Tabs.Screen
         name="scan"
-        options={{ headerTitle: 'Pay & Redeem', tabBarIcon: ({ focused }) => <TabIcon Icon={CardIcon} focused={focused} /> }}
+        options={{ headerShown: false, tabBarIcon: ({ focused }) => <TabIcon Icon={CardIcon} focused={focused} /> }}
       />
       <Tabs.Screen
         name="benefits"

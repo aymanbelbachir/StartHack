@@ -5,6 +5,7 @@ export interface Activity {
   location: string;
   pointsReward: number;
   imageEmoji: string;
+  imageUrl?: string;
   category: string;
   duration: string;
 }
@@ -17,6 +18,7 @@ export const ACTIVITIES: Activity[] = [
     location: 'Interlaken',
     pointsReward: 150,
     imageEmoji: '🪂',
+    imageUrl: 'https://images.unsplash.com/photo-1605548109944-9040d0972bf5?w=800&q=80',
     category: 'Adventure',
     duration: '2h',
   },
@@ -27,6 +29,7 @@ export const ACTIVITIES: Activity[] = [
     location: 'Grindelwald',
     pointsReward: 80,
     imageEmoji: '⛰️',
+    imageUrl: 'https://images.unsplash.com/photo-1533240332313-0db49b459ad6?w=800&q=80',
     category: 'Hiking',
     duration: '4h',
   },
@@ -37,6 +40,7 @@ export const ACTIVITIES: Activity[] = [
     location: 'Grindelwald',
     pointsReward: 60,
     imageEmoji: '🧊',
+    imageUrl: 'https://images.unsplash.com/photo-1666030910636-6291b581962e?w=800&q=80',
     category: 'Nature',
     duration: '3h',
   },
@@ -47,6 +51,7 @@ export const ACTIVITIES: Activity[] = [
     location: 'Thun',
     pointsReward: 50,
     imageEmoji: '⛵',
+    imageUrl: 'https://images.unsplash.com/photo-1717080637896-e44a3cb0f7a2?w=800&q=80',
     category: 'Leisure',
     duration: '2.5h',
   },

@@ -7,6 +7,7 @@ export interface Benefit {
   discountType: 'one_time' | 'multi_use';
   discountValue: number;
   emoji: string;
+  imageUrl?: string;
 }
 
 export const BENEFITS: Benefit[] = [
@@ -19,6 +20,7 @@ export const BENEFITS: Benefit[] = [
     discountType: 'one_time',
     discountValue: 100,
     emoji: '🚂',
+    imageUrl: 'https://images.unsplash.com/photo-1613989937169-d7030ca9f7ab?w=400&q=80',
   },
   {
     id: 'benefit-2',
@@ -29,6 +31,7 @@ export const BENEFITS: Benefit[] = [
     discountType: 'multi_use',
     discountValue: 10,
     emoji: '🍽️',
+    imageUrl: 'https://images.unsplash.com/photo-1733551629631-47d5923a2a98?w=400&q=80',
   },
   {
     id: 'benefit-3',
@@ -39,6 +42,7 @@ export const BENEFITS: Benefit[] = [
     discountType: 'one_time',
     discountValue: 100,
     emoji: '🚵',
+    imageUrl: 'https://images.unsplash.com/photo-1605548109944-9040d0972bf5?w=400&q=80',
   },
   {
     id: 'benefit-4',
@@ -49,5 +53,6 @@ export const BENEFITS: Benefit[] = [
     discountType: 'multi_use',
     discountValue: 100,
     emoji: '🚌',
+    imageUrl: 'https://images.unsplash.com/photo-1594987975747-b0822d768bb2?w=400&q=80',
   },
 ];

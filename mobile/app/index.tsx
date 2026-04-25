@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView,
-  Platform, ScrollView, TouchableOpacity,
+  Platform, ScrollView, TouchableOpacity, ImageBackground,
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -48,10 +48,15 @@ export default function ActivationScreen() {
   return (
     <View style={styles.container}>
       {/* Hero */}
-      <View style={styles.hero}>
+      <ImageBackground
+        source={{ uri: 'https://images.unsplash.com/photo-1666030910636-6291b581962e?w=800&q=80' }}
+        style={styles.hero}
+        resizeMode="cover"
+      >
+        <View style={styles.heroOverlay} />
         <Text style={styles.withUs}>WITH US</Text>
         <Text style={styles.heroTitle}>Discover{'\n'}The Jungfrau{'\n'}Region</Text>
-      </View>
+      </ImageBackground>
 
       {/* White bottom sheet */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheet}>
@@ -107,6 +112,10 @@ const styles = StyleSheet.create({
   hero: {
     flex: 1, justifyContent: 'flex-end',
     paddingHorizontal: 32, paddingBottom: 44,
+  },
+  heroOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(5,46,22,0.52)',
   },
   withUs: {
     color: 'rgba(255,255,255,0.45)', fontSize: 11,

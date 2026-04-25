@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import type { Benefit } from '@/data/benefits';
 
 interface BenefitCardProps {
@@ -17,9 +17,13 @@ export function BenefitCard({ benefit, redeemed = false, onRedeem }: BenefitCard
 
   return (
     <View style={[styles.card, redeemed && styles.cardUsed]}>
-      <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
-        <Text style={styles.emoji}>{benefit.emoji}</Text>
-      </View>
+      {benefit.imageUrl ? (
+        <Image source={{ uri: benefit.imageUrl }} style={styles.iconImg} resizeMode="cover" />
+      ) : (
+        <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
+          <Text style={styles.emoji}>{benefit.emoji}</Text>
+        </View>
+      )}
 
       <View style={styles.middle}>
         <Text style={styles.title} numberOfLines={2}>{benefit.title}</Text>
@@ -53,6 +57,7 @@ const styles = StyleSheet.create({
   },
   cardUsed: { opacity: 0.55 },
   iconBox: { width: 64, height: 64, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  iconImg: { width: 64, height: 64, borderRadius: 16, flexShrink: 0 },
   emoji: { fontSize: 28 },
   middle: { flex: 1, gap: 3 },
   title: { fontSize: 14, fontWeight: '600', color: '#111827', lineHeight: 19 },
