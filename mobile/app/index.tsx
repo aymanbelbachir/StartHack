@@ -8,9 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from '@/components/Button';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 import { saveUserSnapshot, findLocalUserByEmail, restoreUserSnapshot } from '@/lib/userStore';
-import { verifyVoucher, getHotelPublicKey } from '@/lib/voucher';
+import { verifyProof, getHotelPublicKey, extractProofToken } from '@/lib/voucher';
 import type { ReservationData } from '@/lib/voucher';
-import { DEMO_VOUCHER } from '@/data/demoVoucher';
+import { DEMO_PROOF_MD } from '@/data/demoVoucher';
 
 type Mode = 'signup' | 'signin';
 
@@ -28,21 +28,28 @@ export default function ActivationScreen() {
 
   useEffect(() => { setChecking(false); }, []);
 
-  // ── Verify voucher on paste ───────────────────────────────────────────────
+  // ── Verify voucher on paste — accepts raw token OR full .md proof ────────
   const handleVerifyVoucher = async (raw: string) => {
     setVoucher(raw);
-    if (!raw.trim() || !raw.includes('.')) {
+    if (!raw.trim()) {
+      setVoucherStatus('idle');
+      setVoucherData(null);
+      return;
+    }
+    // Support pasting the full .md proof: extract embedded JFP-PROOF token
+    const extracted = extractProofToken(raw.trim());
+    const token = extracted ?? (raw.trim().includes('.') ? raw.trim() : null);
+    if (!token) {
       setVoucherStatus('idle');
       setVoucherData(null);
       return;
     }
     try {
-      // Extract hotelId from payload (without verifying signature yet)
-      const [payload] = raw.trim().split('.');
+      // Decode payload (no sig verify yet) to get hotelId
+      const [payload] = token.split('.');
       const decoded: ReservationData = JSON.parse(atob(payload));
       const hotelId = decoded.hotelId;
 
-      // Fetch hotel public key from Firestore
       const pubB64 = await getHotelPublicKey(hotelId);
       if (!pubB64) {
         setVoucherStatus('error');
@@ -51,11 +58,11 @@ export default function ActivationScreen() {
         return;
       }
 
-      const result = await verifyVoucher(raw.trim(), pubB64);
+      const result = await verifyProof(token, pubB64);
       if (result.valid && result.data) {
         setVoucherStatus('ok');
         setVoucherData(result.data);
-        setName(result.data.client); // pre-fill name from voucher
+        setName(result.data.client);
         setVoucherError('');
       } else {
         setVoucherStatus('error');
@@ -248,15 +255,16 @@ export default function ActivationScreen() {
                 {voucherStatus === 'ok' && voucherData && (
                   <View style={styles.voucherOk}>
                     <Text style={styles.voucherOkText}>
-                      ✅ {voucherData.hotel} · {voucherData.checkIn} → {voucherData.checkOut} · {voucherData.tokens} tokens
+                      ✅ {voucherData.hotel} · {voucherData.montant} {voucherData.devise}{'\n'}
+                      {voucherData.checkIn} → {voucherData.checkOut} · {voucherData.tokens} 🪙
                     </Text>
                   </View>
                 )}
                 {voucherStatus === 'error' && (
                   <Text style={styles.voucherErr}>❌ {voucherError}</Text>
                 )}
-                <TouchableOpacity onPress={() => handleVerifyVoucher(DEMO_VOUCHER)} activeOpacity={0.7}>
-                  <Text style={styles.demoBtn}>⚡ Utiliser le voucher de démo</Text>
+                <TouchableOpacity onPress={() => handleVerifyVoucher(DEMO_PROOF_MD)} activeOpacity={0.7}>
+                  <Text style={styles.demoBtn}>⚡ Utiliser la preuve de démo (.md)</Text>
                 </TouchableOpacity>
               </View>
             )}

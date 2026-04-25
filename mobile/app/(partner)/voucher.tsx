@@ -6,7 +6,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QRCode from 'react-native-qrcode-svg';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
-import { generateHotelKeyPair, signVoucher } from '@/lib/voucher';
+import { generateHotelKeyPair, signProof, generateProofMD } from '@/lib/voucher';
 import type { ReservationData } from '@/lib/voucher';
 import Svg, { Path } from 'react-native-svg';
 
@@ -38,9 +38,11 @@ export default function VoucherScreen() {
   const [checkIn,   setCheckIn]   = useState(() => addDays(new Date(), 1));
   const [checkOut,  setCheckOut]  = useState(() => addDays(new Date(), 3));
   const [tokens,    setTokens]    = useState(50);
+  const [montant,   setMontant]   = useState(200);
 
   // result
-  const [voucher, setVoucher] = useState<string | null>(null);
+  const [voucher,   setVoucher]   = useState<string | null>(null);
+  const [proofMD,   setProofMD]   = useState<string | null>(null);
 
   const nights = nightsBetween(checkIn, checkOut);
 
@@ -97,11 +99,14 @@ export default function VoucherScreen() {
         checkIn:  toISO(checkIn),
         checkOut: toISO(checkOut),
         nights,
+        montant,
+        devise: 'CHF',
         tokens,
-        exp: Date.now() + 30 * DAY_MS, // valid 30 days
+        exp: Date.now() + 30 * DAY_MS,
       };
-      const v = await signVoucher(data, privJwk);
+      const v = await signProof(data, privJwk);
       setVoucher(v);
+      setProofMD(generateProofMD(data, v));
     } catch (e: any) {
       Alert.alert('Erreur signature', e.message ?? 'Échec');
     } finally {
@@ -110,8 +115,8 @@ export default function VoucherScreen() {
   };
 
   const handleShare = async () => {
-    if (!voucher) return;
-    await Share.share({ message: voucher, title: 'Voucher Jungfrau Pass' });
+    if (!proofMD) return;
+    await Share.share({ message: proofMD, title: 'Jungfrau Pass — Preuve de Paiement' });
   };
 
   // ── if no key yet ─────────────────────────────────────────────────────────
@@ -188,9 +193,19 @@ export default function VoucherScreen() {
             </View>
           </View>
 
+          {/* Montant CHF */}
+          <View style={s.field}>
+            <Text style={s.label}>Montant réglé (CHF)</Text>
+            <View style={s.datePicker}>
+              <TouchableOpacity style={s.dateArrow} onPress={() => setMontant(m => Math.max(50, m - 50))}><MinusIcon /></TouchableOpacity>
+              <Text style={s.dateVal}>{montant} CHF</Text>
+              <TouchableOpacity style={s.dateArrow} onPress={() => setMontant(m => m + 50)}><PlusIcon /></TouchableOpacity>
+            </View>
+          </View>
+
           {/* Tokens */}
           <View style={s.field}>
-            <Text style={s.label}>Tokens accordés au guest</Text>
+            <Text style={s.label}>Tokens Jungfrau Pass accordés</Text>
             <View style={s.datePicker}>
               <TouchableOpacity style={s.dateArrow} onPress={() => setTokens(t => Math.max(1, t - 10))}><MinusIcon /></TouchableOpacity>
               <Text style={s.dateVal}>{tokens} 🪙</Text>
@@ -200,8 +215,8 @@ export default function VoucherScreen() {
 
           {/* Summary */}
           <View style={s.summary}>
-            <Text style={s.summaryText}>{nights} nuit{nights > 1 ? 's' : ''} · chambre {chambre}</Text>
-            <Text style={s.summaryText}>{guestName || '—'} · {tokens} tokens</Text>
+            <Text style={s.summaryText}>{nights} nuit{nights > 1 ? 's' : ''} · chambre {chambre} · {montant} CHF</Text>
+            <Text style={s.summaryText}>{guestName || '—'} · {tokens} tokens 🪙</Text>
           </View>
 
           <TouchableOpacity style={[s.genBtn, generating && { opacity: 0.5 }]} onPress={handleGenerate} disabled={generating} activeOpacity={0.85}>
@@ -210,30 +225,31 @@ export default function VoucherScreen() {
         </View>
 
         {/* Voucher result */}
-        {voucher && (
+        {voucher && proofMD && (
           <View style={s.voucherCard}>
-            <Text style={s.voucherTitle}>✅ Bon signé</Text>
-            <Text style={s.voucherSub}>Le guest scanne ce QR pour s'inscrire</Text>
+            <Text style={s.voucherTitle}>✅ Preuve de paiement signée</Text>
+            <Text style={s.voucherSub}>QR code à scanner · ou partager le .md à l'invité</Text>
 
             <View style={s.qrBox}>
               <QRCode value={voucher} size={220} color="#111827" backgroundColor="#FFFFFF" />
             </View>
 
             <View style={s.voucherInfo}>
-              <Row label="Client"    val={guestName} />
-              <Row label="Hôtel"     val={partnerName} />
-              <Row label="Check-in"  val={toISO(checkIn)} />
+              <Row label="Client"   val={guestName} />
+              <Row label="Hôtel"    val={partnerName} />
+              <Row label="Check-in" val={toISO(checkIn)} />
               <Row label="Check-out" val={toISO(checkOut)} />
-              <Row label="Nuits"     val={String(nights)} />
-              <Row label="Tokens"    val={`${tokens} 🪙`} />
-              <Row label="Expire"    val="dans 30 jours" />
+              <Row label="Nuits"    val={String(nights)} />
+              <Row label="Montant"  val={`${montant} CHF`} />
+              <Row label="Tokens"   val={`${tokens} 🪙`} />
+              <Row label="Expire"   val="dans 30 jours" />
             </View>
 
             <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.85}>
-              <Text style={s.shareBtnText}>Partager le bon</Text>
+              <Text style={s.shareBtnText}>Partager la facture .md</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={s.resetBtn} onPress={() => { setVoucher(null); setGuestName(''); }} activeOpacity={0.8}>
+            <TouchableOpacity style={s.resetBtn} onPress={() => { setVoucher(null); setProofMD(null); setGuestName(''); }} activeOpacity={0.8}>
               <Text style={s.resetBtnText}>Nouveau bon</Text>
             </TouchableOpacity>
           </View>

@@ -9,6 +9,9 @@ export interface WalletData {
   tokenBalance: number;
   pointsBalance: number;
   checkInLocation: string;
+  checkIn?: string;
+  checkOut?: string;
+  chambre?: string;
 }
 
 export function useWallet(userId: string | null) {

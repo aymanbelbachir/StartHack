@@ -8,6 +8,7 @@ import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { saveUserSnapshot } from '@/lib/userStore';
 import { useWallet } from '@/hooks/useWallet';
+import { stayStatus } from '@/lib/voucher';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 // ─── weather ─────────────────────────────────────────────────────────────────
@@ -141,6 +142,7 @@ export default function MapScreen() {
   const name = wallet?.name ?? 'Guest';
   const balance = wallet?.tokenBalance ?? 50;
   const initial = name.charAt(0).toUpperCase();
+  const stay = wallet?.checkIn && wallet?.checkOut ? stayStatus(wallet.checkIn, wallet.checkOut) : null;
 
   return (
     <View style={styles.container}>
@@ -250,6 +252,13 @@ export default function MapScreen() {
 
       {/* ── Bottom wallet card ── */}
       <View style={styles.bottomCard}>
+        {stay && (
+          <View style={[styles.stayPill, stay.active ? styles.stayPillActive : styles.stayPillInactive]}>
+            <Text style={[styles.stayPillText, stay.active ? styles.stayPillTextActive : styles.stayPillTextInactive]}>
+              {stay.active ? '🟢' : '🔴'} {stay.label}
+            </Text>
+          </View>
+        )}
         <View style={styles.balanceRow}>
           <View>
             <Text style={styles.balanceLabel}>YOUR BALANCE</Text>
@@ -258,7 +267,11 @@ export default function MapScreen() {
               <Text style={styles.balanceCoin}>🪙 tokens</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.payBtn} onPress={() => router.push('/(guest)/scan' as any)} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={[styles.payBtn, stay && !stay.active && styles.payBtnDisabled]}
+            onPress={() => router.push('/(guest)/scan' as any)}
+            activeOpacity={0.85}
+          >
             <Text style={styles.payBtnText}>Pay / Scan</Text>
           </TouchableOpacity>
         </View>
@@ -384,7 +397,15 @@ const styles = StyleSheet.create({
   balanceNum: { fontSize: 28, fontWeight: '800', color: '#111827', letterSpacing: -1 },
   balanceCoin: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
   payBtn: { backgroundColor: '#14532D', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 11 },
+  payBtnDisabled: { backgroundColor: '#9CA3AF' },
   payBtnText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
+
+  stayPill: { borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, marginBottom: 10, alignSelf: 'stretch', alignItems: 'center' },
+  stayPillActive: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#86EFAC' },
+  stayPillInactive: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FCA5A5' },
+  stayPillText: { fontSize: 12, fontWeight: '700' },
+  stayPillTextActive: { color: '#16A34A' },
+  stayPillTextInactive: { color: '#DC2626' },
 
   // quest modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },

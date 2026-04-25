@@ -8,6 +8,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 import { saveUserSnapshot } from '@/lib/userStore';
+import { isStayActive, stayStatus } from '@/lib/voucher';
 import { getAvailability, createBooking } from '@/lib/bookingStore';
 import type { Availability, Booking } from '@/lib/bookingStore';
 import QRCode from 'react-native-qrcode-svg';
@@ -182,6 +183,9 @@ export default function ScanScreen() {
   const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
+  // ── stay status ──
+  const [stayInfo, setStayInfo] = useState<ReturnType<typeof stayStatus> | null>(null);
+
   // ── new ui state ──
   const [activeTab, setActiveTab] = useState<'scan' | 'manual'>('scan');
   const [searchQuery, setSearchQuery] = useState('');
@@ -211,6 +215,11 @@ export default function ScanScreen() {
   const scanAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     AsyncStorage.getItem('userId').then(setUserId);
+    AsyncStorage.getItem('wallet_data').then(raw => {
+      if (!raw) return;
+      const w = JSON.parse(raw);
+      if (w.checkIn && w.checkOut) setStayInfo(stayStatus(w.checkIn, w.checkOut));
+    });
     // Load partners from Firestore
     if (FIREBASE_CONFIGURED && db) {
       (async () => {
@@ -290,6 +299,10 @@ export default function ScanScreen() {
     const raw = await AsyncStorage.getItem('wallet_data');
     if (!raw) { Alert.alert('Error', 'Wallet not found'); return; }
     const wallet: WalletData = JSON.parse(raw);
+    if (mode === 'pay' && (wallet as any).checkIn && (wallet as any).checkOut && !isStayActive((wallet as any).checkIn, (wallet as any).checkOut)) {
+      Alert.alert('Séjour inactif', `Votre carte n'est valable que du ${(wallet as any).checkIn} au ${(wallet as any).checkOut}.`);
+      return;
+    }
     if (mode === 'pay') {
       if (wallet.tokenBalance < tokenAmt) { Alert.alert('Insufficient tokens', `Balance: ${wallet.tokenBalance}`); return; }
       wallet.tokenBalance -= tokenAmt;
@@ -325,6 +338,9 @@ export default function ScanScreen() {
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) throw new Error('User not found');
       const data = userSnap.data();
+      if (mode === 'pay' && data.checkIn && data.checkOut && !isStayActive(data.checkIn, data.checkOut)) {
+        throw new Error(`Séjour inactif — carte valable du ${data.checkIn} au ${data.checkOut} uniquement.`);
+      }
       if (mode === 'pay') {
         if (data.tokenBalance < tokenAmt) throw new Error(`Insufficient tokens (balance: ${data.tokenBalance})`);
         // Deduct from guest
@@ -405,6 +421,11 @@ export default function ScanScreen() {
     const raw = await AsyncStorage.getItem('wallet_data');
     if (!raw) { Alert.alert('Erreur', 'Wallet introuvable'); setScanned(false); return; }
     const wallet = JSON.parse(raw);
+    if (wallet.checkIn && wallet.checkOut && !isStayActive(wallet.checkIn, wallet.checkOut)) {
+      Alert.alert('Séjour inactif', `Votre carte Jungfrau Pass n'est valable que du ${wallet.checkIn} au ${wallet.checkOut}.\n\nVous ne pouvez pas dépenser de tokens en dehors de votre séjour.`);
+      setScanned(false);
+      return;
+    }
     if (wallet.tokenBalance < amt) {
       Alert.alert('Tokens insuffisants', `Il te faut ${amt} tokens mais tu n'as que ${wallet.tokenBalance}.`);
       setScanned(false);
@@ -607,6 +628,15 @@ export default function ScanScreen() {
           <Text style={s.headerTitle}>Scan and Pay</Text>
           <Text style={s.headerSub}>Align the camera with the QR code or search a partner</Text>
         </View>
+
+        {/* stay status banner */}
+        {stayInfo && (
+          <View style={[s.stayBanner, stayInfo.active ? s.stayBannerActive : s.stayBannerInactive]}>
+            <Text style={[s.stayBannerText, stayInfo.active ? s.stayBannerTextActive : s.stayBannerTextInactive]}>
+              {stayInfo.active ? '🟢' : '🔴'} {stayInfo.label}
+            </Text>
+          </View>
+        )}
 
         {/* tab toggle */}
         <View style={s.tabRow}>
@@ -950,8 +980,17 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
   headerSub: { fontSize: 13, color: '#6B7280', textAlign: 'center' },
 
+  stayBanner: {
+    marginHorizontal: 20, marginTop: 12, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
+  },
+  stayBannerActive: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#86EFAC' },
+  stayBannerInactive: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FCA5A5' },
+  stayBannerText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  stayBannerTextActive: { color: '#16A34A' },
+  stayBannerTextInactive: { color: '#DC2626' },
+
   tabRow: {
-    flexDirection: 'row', marginHorizontal: 20, marginTop: 20,
+    flexDirection: 'row', marginHorizontal: 20, marginTop: 12,
     backgroundColor: '#E5E7EB', borderRadius: 999, padding: 4, gap: 4,
   },
   tabBtn: { flex: 1, paddingVertical: 10, borderRadius: 999, alignItems: 'center' },
