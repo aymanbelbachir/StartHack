@@ -8,130 +8,111 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from '@/components/Button';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 import { saveUserSnapshot, findLocalUserByEmail, restoreUserSnapshot } from '@/lib/userStore';
-import { verifyProof, getHotelPublicKey, extractProofToken } from '@/lib/voucher';
-import type { ReservationData } from '@/lib/voucher';
-import { DEMO_PROOF_MD } from '@/data/demoVoucher';
 
 type Mode = 'signup' | 'signin';
 
-export default function ActivationScreen() {
+// ─── Firebase Auth REST API (works in Expo Go — no native SDK needed) ─────────
+const API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '';
+const AUTH_URL = 'https://identitytoolkit.googleapis.com/v1/accounts';
+
+async function authRequest(endpoint: string, body: object) {
+  const res = await fetch(`${AUTH_URL}:${endpoint}?key=${API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const code = data?.error?.message ?? 'UNKNOWN';
+    const messages: Record<string, string> = {
+      EMAIL_EXISTS:              'An account with this email already exists. Use Sign In.',
+      EMAIL_NOT_FOUND:           'No account with this email. Create an account first.',
+      INVALID_PASSWORD:          'Incorrect password.',
+      INVALID_LOGIN_CREDENTIALS: 'Incorrect email or password.',
+      TOO_MANY_ATTEMPTS_TRY_LATER: 'Too many attempts. Please wait and try again.',
+      WEAK_PASSWORD:             'Password must be at least 6 characters.',
+      INVALID_EMAIL:             'Please enter a valid email address.',
+    };
+    throw new Error(messages[code] ?? code);
+  }
+  return data as { localId: string; idToken: string; email: string };
+}
+
+// ─── screen ───────────────────────────────────────────────────────────────────
+export default function AuthScreen() {
   const [mode, setMode] = useState<Mode>('signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [voucher, setVoucher] = useState('');
-  const [voucherStatus, setVoucherStatus] = useState<'idle' | 'ok' | 'error'>('idle');
-  const [voucherData, setVoucherData] = useState<ReservationData | null>(null);
-  const [voucherError, setVoucherError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => { setChecking(false); }, []);
 
-  // ── Verify voucher on paste — accepts raw token OR full .md proof ────────
-  const handleVerifyVoucher = async (raw: string) => {
-    setVoucher(raw);
-    if (!raw.trim()) {
-      setVoucherStatus('idle');
-      setVoucherData(null);
-      return;
-    }
-    // Support pasting the full .md proof: extract embedded JFP-PROOF token
-    const extracted = extractProofToken(raw.trim());
-    const token = extracted ?? (raw.trim().includes('.') ? raw.trim() : null);
-    if (!token) {
-      setVoucherStatus('idle');
-      setVoucherData(null);
-      return;
-    }
-    try {
-      // Decode payload (no sig verify yet) to get hotelId
-      const [payload] = token.split('.');
-      const decoded: ReservationData = JSON.parse(atob(payload));
-      const hotelId = decoded.hotelId;
-
-      const pubB64 = await getHotelPublicKey(hotelId);
-      if (!pubB64) {
-        setVoucherStatus('error');
-        setVoucherError(`Clé publique introuvable pour ${hotelId}`);
-        setVoucherData(null);
-        return;
-      }
-
-      const result = await verifyProof(token, pubB64);
-      if (result.valid && result.data) {
-        setVoucherStatus('ok');
-        setVoucherData(result.data);
-        setName(result.data.client);
-        setVoucherError('');
-      } else {
-        setVoucherStatus('error');
-        setVoucherError(result.error ?? 'Bon invalide');
-        setVoucherData(null);
-      }
-    } catch {
-      setVoucherStatus('error');
-      setVoucherError('Format de bon invalide');
-      setVoucherData(null);
-    }
-  };
-
-  // ── Sign Up ──────────────────────────────────────────────────────────────
   const handleSignUp = async () => {
     if (!name || !email || !password) {
-      Alert.alert('Champs manquants', 'Remplissez tous les champs');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Mot de passe trop court', 'Minimum 6 caractères');
-      return;
-    }
-    if (voucherStatus !== 'ok' || !voucherData) {
-      Alert.alert('Bon requis', 'Collez votre bon de réservation signé par l\'hôtel');
+      Alert.alert('Missing fields', 'Please fill in all fields');
       return;
     }
     setLoading(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const walletData = {
-        name,
-        email: normalizedEmail,
-        hotelCode: voucherData.hotelId,
-        tokenBalance: voucherData.tokens,
-        pointsBalance: 0,
-        checkInLocation: voucherData.hotel,
-        checkIn: voucherData.checkIn,
-        checkOut: voucherData.checkOut,
-        chambre: voucherData.chambre,
-      };
 
       if (FIREBASE_CONFIGURED && db) {
-        const { collection, query, where, getDocs, addDoc, serverTimestamp, limit } = await import('firebase/firestore');
-        const existing = await getDocs(query(collection(db, 'users'), where('email', '==', normalizedEmail), limit(1)));
-        if (!existing.empty) {
-          Alert.alert('Compte existant', 'Un compte avec cet email existe déjà. Utilisez "Connexion".');
+        const { collection, query, where, getDocs, doc, setDoc, serverTimestamp, limit } = await import('firebase/firestore');
+
+        // If email belongs to a partner: create their Firebase Auth account and go to partner dashboard
+        const partnerSnap = await getDocs(
+          query(collection(db, 'partners'), where('email', '==', normalizedEmail), limit(1))
+        );
+        if (!partnerSnap.empty) {
+          const { localId } = await authRequest('signUp', {
+            email: normalizedEmail, password, returnSecureToken: true,
+          });
+          const partnerDoc = partnerSnap.docs[0];
+          await AsyncStorage.multiSet([
+            ['partnerId', partnerDoc.id],
+            ['partnerName', partnerDoc.data().name ?? ''],
+            ['role', 'partner'],
+          ]);
+          router.replace('/(partner)');
           return;
         }
-        const docRef = await addDoc(collection(db, 'users'), {
-          ...walletData, password, activatedAt: serverTimestamp(),
+
+        // Regular guest sign-up — create Firebase Auth user (password stored securely by Firebase)
+        const { localId } = await authRequest('signUp', {
+          email: normalizedEmail, password, returnSecureToken: true,
         });
+
+        // Firestore profile — no password stored here
+        await setDoc(doc(db, 'users', localId), {
+          name, email: normalizedEmail,
+          tokenBalance: 0, pointsBalance: 0,
+          createdAt: serverTimestamp(),
+        });
+
         await AsyncStorage.multiSet([
-          ['userId', docRef.id],
+          ['userId', localId],
           ['role', 'guest'],
-          ['wallet_data', JSON.stringify(walletData)],
+          ['wallet_data', JSON.stringify({ name, email: normalizedEmail, tokenBalance: 0, pointsBalance: 0 })],
           ['transactions', '[]'],
+          ['registered_activities', '[]'],
+          ['discovered_quests', '[]'],
+          ['redeemed_benefits', '[]'],
+          ['partner_balances', '{}'],
         ]);
       } else {
+        // Offline fallback
         const existing = await findLocalUserByEmail(normalizedEmail);
         if (existing) {
-          Alert.alert('Compte existant', 'Un compte avec cet email existe déjà. Utilisez "Connexion".');
+          Alert.alert('Account exists', 'An account with this email already exists. Use Sign In.');
           return;
         }
         const userId = `local-${Date.now()}`;
         await AsyncStorage.multiSet([
           ['userId', userId],
           ['role', 'guest'],
-          ['wallet_data', JSON.stringify(walletData)],
+          ['wallet_data', JSON.stringify({ name, email: normalizedEmail, tokenBalance: 0, pointsBalance: 0 })],
           ['transactions', '[]'],
           ['registered_activities', '[]'],
           ['discovered_quests', '[]'],
@@ -140,58 +121,71 @@ export default function ActivationScreen() {
         ]);
         await saveUserSnapshot();
       }
+
       router.replace('/(guest)');
     } catch (e: any) {
-      Alert.alert('Erreur', e.message ?? 'Inscription échouée');
+      Alert.alert('Error', e.message ?? 'Sign up failed');
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Sign In ──────────────────────────────────────────────────────────────
   const handleSignIn = async () => {
     if (!email || !password) {
-      Alert.alert('Champs manquants', 'Entrez votre email et mot de passe');
+      Alert.alert('Missing fields', 'Enter your email and password');
       return;
     }
     setLoading(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
+
       if (FIREBASE_CONFIGURED && db) {
-        const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
-        const snap = await getDocs(query(collection(db, 'users'), where('email', '==', normalizedEmail), limit(1)));
-        if (snap.empty) {
-          Alert.alert('Introuvable', 'Aucun compte avec cet email. Créez un compte d\'abord.');
+        const { collection, query, where, getDocs, doc, getDoc, limit } = await import('firebase/firestore');
+
+        // Check partner by email before auth
+        const partnerSnap = await getDocs(
+          query(collection(db, 'partners'), where('email', '==', normalizedEmail), limit(1))
+        );
+        if (!partnerSnap.empty) {
+          // Authenticate via Firebase Auth REST
+          await authRequest('signInWithPassword', {
+            email: normalizedEmail, password, returnSecureToken: true,
+          });
+          const partnerDoc = partnerSnap.docs[0];
+          await AsyncStorage.multiSet([
+            ['partnerId', partnerDoc.id],
+            ['partnerName', partnerDoc.data().name ?? ''],
+            ['role', 'partner'],
+          ]);
+          router.replace('/(partner)');
           return;
         }
-        const userDoc = snap.docs[0];
-        const userData = userDoc.data();
-        if (userData.password !== password) {
-          Alert.alert('Mauvais mot de passe', 'Mot de passe incorrect.');
-          return;
-        }
-        const { password: _, activatedAt: __, ...walletData } = userData;
+
+        // Guest sign-in via Firebase Auth REST
+        const { localId } = await authRequest('signInWithPassword', {
+          email: normalizedEmail, password, returnSecureToken: true,
+        });
+
+        const userDoc = await getDoc(doc(db, 'users', localId));
+        const walletData = userDoc.exists() ? userDoc.data() : { name: '', email: normalizedEmail, tokenBalance: 0, pointsBalance: 0 };
         await AsyncStorage.multiSet([
-          ['userId', userDoc.id],
+          ['userId', localId],
           ['role', 'guest'],
           ['wallet_data', JSON.stringify(walletData)],
         ]);
+        router.replace('/(guest)');
       } else {
-        const snapshot = await findLocalUserByEmail(normalizedEmail);
+        // Offline fallback
+        const snapshot = await findLocalUserByEmail(email.trim().toLowerCase());
         if (!snapshot) {
-          Alert.alert('Introuvable', 'Aucun compte avec cet email.');
-          return;
-        }
-        const wallet = JSON.parse(snapshot.wallet_data);
-        if (wallet.password && wallet.password !== password) {
-          Alert.alert('Mauvais mot de passe', 'Mot de passe incorrect.');
+          Alert.alert('Not found', 'No account with this email. Create an account first.');
           return;
         }
         await restoreUserSnapshot(snapshot);
+        router.replace('/(guest)');
       }
-      router.replace('/(guest)');
     } catch (e: any) {
-      Alert.alert('Erreur', e.message ?? 'Connexion échouée');
+      Alert.alert('Error', e.message ?? 'Sign in failed');
     } finally {
       setLoading(false);
     }
@@ -220,91 +214,74 @@ export default function ActivationScreen() {
       </ImageBackground>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheet}>
-        <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-
-          {/* Mode toggle */}
+        <ScrollView
+          contentContainerStyle={styles.sheetContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.modeRow}>
-            <TouchableOpacity style={[styles.modeBtn, !isSignIn && styles.modeBtnActive]} onPress={() => setMode('signup')}>
-              <Text style={[styles.modeBtnText, !isSignIn && styles.modeBtnTextActive]}>Créer un compte</Text>
+            <TouchableOpacity
+              style={[styles.modeBtn, !isSignIn && styles.modeBtnActive]}
+              onPress={() => setMode('signup')}
+            >
+              <Text style={[styles.modeBtnText, !isSignIn && styles.modeBtnTextActive]}>Create Account</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.modeBtn, isSignIn && styles.modeBtnActive]} onPress={() => setMode('signin')}>
-              <Text style={[styles.modeBtnText, isSignIn && styles.modeBtnTextActive]}>Connexion</Text>
+            <TouchableOpacity
+              style={[styles.modeBtn, isSignIn && styles.modeBtnActive]}
+              onPress={() => setMode('signin')}
+            >
+              <Text style={[styles.modeBtnText, isSignIn && styles.modeBtnTextActive]}>Sign In</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.fields}>
-            {/* Voucher field — sign up only */}
             {!isSignIn && (
               <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Bon de réservation</Text>
+                <Text style={styles.fieldLabel}>FULL NAME</Text>
                 <TextInput
-                  style={[
-                    styles.input,
-                    voucherStatus === 'ok' && styles.inputOk,
-                    voucherStatus === 'error' && styles.inputErr,
-                  ]}
-                  value={voucher}
-                  onChangeText={handleVerifyVoucher}
-                  placeholder="Collez votre bon signé par l'hôtel…"
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Your name"
                   placeholderTextColor="#D1D5DB"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  multiline
-                  numberOfLines={3}
+                  autoCapitalize="words"
                 />
-                {voucherStatus === 'ok' && voucherData && (
-                  <View style={styles.voucherOk}>
-                    <Text style={styles.voucherOkText}>
-                      ✅ {voucherData.hotel} · {voucherData.montant} {voucherData.devise}{'\n'}
-                      {voucherData.checkIn} → {voucherData.checkOut} · {voucherData.tokens} 🪙
-                    </Text>
-                  </View>
-                )}
-                {voucherStatus === 'error' && (
-                  <Text style={styles.voucherErr}>❌ {voucherError}</Text>
-                )}
-                <TouchableOpacity onPress={() => handleVerifyVoucher(DEMO_PROOF_MD)} activeOpacity={0.7}>
-                  <Text style={styles.demoBtn}>⚡ Utiliser la preuve de démo (.md)</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {!isSignIn && (
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Nom complet</Text>
-                <TextInput style={styles.input} value={name} onChangeText={setName}
-                  placeholder="Votre nom" placeholderTextColor="#D1D5DB" autoCapitalize="words" />
               </View>
             )}
 
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Email</Text>
-              <TextInput style={styles.input} value={email} onChangeText={setEmail}
-                placeholder="vous@exemple.com" placeholderTextColor="#D1D5DB"
-                keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+              <Text style={styles.fieldLabel}>EMAIL</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                placeholderTextColor="#D1D5DB"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Mot de passe</Text>
-              <TextInput style={styles.input} value={password} onChangeText={setPassword}
-                placeholder={isSignIn ? 'Votre mot de passe' : 'Min. 6 caractères'}
-                placeholderTextColor="#D1D5DB" secureTextEntry />
+              <Text style={styles.fieldLabel}>PASSWORD</Text>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder={isSignIn ? 'Your password' : 'Min. 6 characters'}
+                placeholderTextColor="#D1D5DB"
+                secureTextEntry
+              />
             </View>
           </View>
 
           <Button
-            title={isSignIn ? 'Se connecter' : 'Créer mon compte'}
+            title={isSignIn ? 'Sign In' : 'Create Account'}
             onPress={isSignIn ? handleSignIn : handleSignUp}
             loading={loading}
             style={styles.actionBtn}
           />
-
-          <View style={styles.partnerRow}>
-            <Text style={styles.partnerText}>Vous êtes un partenaire ?</Text>
-            <TouchableOpacity onPress={() => router.push('/role')}>
-              <Text style={styles.partnerLink}>  Connexion ici</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -327,19 +304,10 @@ const styles = StyleSheet.create({
   modeBtnTextActive: { color: '#FFFFFF' },
   fields: { gap: 12 },
   field: { gap: 5 },
-  fieldLabel: { fontSize: 12, fontWeight: '600', color: '#6B7280', letterSpacing: 0.3 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1 },
   input: {
-    minHeight: 50, borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E7EB',
-    paddingHorizontal: 16, paddingVertical: 12, fontSize: 13, color: '#111827', backgroundColor: '#F9FAFB',
+    height: 50, borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E7EB',
+    paddingHorizontal: 16, fontSize: 13, color: '#111827', backgroundColor: '#F9FAFB',
   },
-  inputOk:  { borderColor: '#86EFAC' },
-  inputErr: { borderColor: '#FCA5A5' },
-  voucherOk: { backgroundColor: '#F0FDF4', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#BBF7D0' },
-  voucherOkText: { fontSize: 12, color: '#16A34A', fontWeight: '600', lineHeight: 18 },
-  voucherErr: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
   actionBtn: { marginTop: 4 },
-  partnerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 4 },
-  partnerText: { fontSize: 13, color: '#9CA3AF' },
-  partnerLink: { fontSize: 13, color: '#111827', fontWeight: '700' },
-  demoBtn: { fontSize: 12, color: '#6B7280', fontWeight: '600', textDecorationLine: 'underline', marginTop: 4 },
 });
