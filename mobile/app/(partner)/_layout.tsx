@@ -26,6 +26,31 @@ const CheckCircleIcon = ({ color, size = 22 }: IC) => (
   </Svg>
 );
 
+const CalendarIcon = ({ color, size = 22 }: IC) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x="3" y="4" width="18" height="17" rx="2" stroke={color} strokeWidth="2" />
+    <Path d="M3 9h18" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M8 2v4" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M16 2v4" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M7 13h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M11 13h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M15 13h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M7 17h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M11 17h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+  </Svg>
+);
+
+const ListIcon = ({ color, size = 22 }: IC) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M8 6h13" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M8 12h13" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M8 18h13" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M3 6h.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M3 12h.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M3 18h.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
+  </Svg>
+);
+
 const TabIcon = ({ Icon, focused }: { Icon: React.FC<IC>; focused: boolean }) => (
   <View style={focused ? { backgroundColor: '#84CC16', borderRadius: 999, padding: 8 } : { padding: 8 }}>
     <Icon color={focused ? '#111827' : '#9CA3AF'} size={20} />
@@ -72,6 +97,14 @@ export default function PartnerLayout() {
       <Tabs.Screen
         name="confirm"
         options={{ headerTitle: 'Confirm Redemption', tabBarIcon: ({ focused }) => <TabIcon Icon={CheckCircleIcon} focused={focused} /> }}
+      />
+      <Tabs.Screen
+        name="availability"
+        options={{ headerTitle: 'Availability Settings', tabBarIcon: ({ focused }) => <TabIcon Icon={CalendarIcon} focused={focused} /> }}
+      />
+      <Tabs.Screen
+        name="bookings"
+        options={{ headerTitle: 'Reservations', tabBarIcon: ({ focused }) => <TabIcon Icon={ListIcon} focused={focused} /> }}
       />
     </Tabs>
   );

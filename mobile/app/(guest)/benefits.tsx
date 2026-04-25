@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, Alert, View, Text, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { saveUserSnapshot } from '@/lib/userStore';
 import { BenefitCard } from '@/components/BenefitCard';
 import { BENEFITS } from '@/data/benefits';
 
@@ -28,6 +29,7 @@ export default function BenefitsScreen() {
             const next = new Set([...redeemed, benefitId]);
             setRedeemed(next);
             await AsyncStorage.setItem('redeemed_benefits', JSON.stringify([...next]));
+            await saveUserSnapshot();
           },
         },
       ]

@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import type { Activity } from '@/data/activities';
 
 interface ActivityCardProps {
   activity: Activity;
   registered?: boolean;
+  loading?: boolean;
   onRegister?: () => void;
+  onUnregister?: () => void;
 }
 
 const CATEGORY_BG: Record<string, string> = {
@@ -15,7 +17,7 @@ const CATEGORY_BG: Record<string, string> = {
   Leisure:   '#1D4ED8',
 };
 
-export function ActivityCard({ activity, registered = false, onRegister }: ActivityCardProps) {
+export function ActivityCard({ activity, registered = false, loading = false, onRegister, onUnregister }: ActivityCardProps) {
   const heroBg = CATEGORY_BG[activity.category] ?? '#14532D';
 
   return (
@@ -31,6 +33,11 @@ export function ActivityCard({ activity, registered = false, onRegister }: Activ
         <View style={styles.catBadge}>
           <Text style={styles.catText}>{activity.category}</Text>
         </View>
+        {registered && (
+          <View style={styles.checkBadge}>
+            <Text style={styles.checkText}>✓</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -53,16 +60,24 @@ export function ActivityCard({ activity, registered = false, onRegister }: Activ
 
         <Text style={styles.description} numberOfLines={2}>{activity.description}</Text>
 
-        <TouchableOpacity
-          style={[styles.btn, registered && styles.btnDone]}
-          onPress={!registered ? onRegister : undefined}
-          disabled={registered}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.btnText, registered && styles.btnDoneText]}>
-            {registered ? '✓ Registered' : 'Register'}
-          </Text>
-        </TouchableOpacity>
+        {loading ? (
+          <View style={styles.btnLoading}>
+            <ActivityIndicator color="#6B7280" size="small" />
+          </View>
+        ) : registered ? (
+          <View style={styles.registeredRow}>
+            <View style={styles.registeredBadge}>
+              <Text style={styles.registeredBadgeText}>✓ Registered</Text>
+            </View>
+            <TouchableOpacity style={styles.unregisterBtn} onPress={onUnregister} activeOpacity={0.8}>
+              <Text style={styles.unregisterText}>Unregister</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.btn} onPress={onRegister} activeOpacity={0.8}>
+            <Text style={styles.btnText}>Register</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -82,6 +97,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
   },
   catText: { fontSize: 11, color: '#FFFFFF', fontWeight: '600' },
+  checkBadge: {
+    position: 'absolute', top: 10, right: 12,
+    backgroundColor: '#84CC16', borderRadius: 999, width: 28, height: 28,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkText: { fontSize: 14, fontWeight: '800', color: '#111827' },
   content: { padding: 16, gap: 12 },
   title: { fontSize: 17, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
   stats: { flexDirection: 'row', gap: 8 },
@@ -91,7 +112,17 @@ const styles = StyleSheet.create({
   statLime: { color: '#65A30D' },
   description: { fontSize: 13, color: '#6B7280', lineHeight: 19 },
   btn: { backgroundColor: '#84CC16', borderRadius: 999, height: 48, alignItems: 'center', justifyContent: 'center' },
-  btnDone: { backgroundColor: '#F3F4F6' },
   btnText: { color: '#111827', fontSize: 14, fontWeight: '700' },
-  btnDoneText: { color: '#9CA3AF' },
+  btnLoading: { height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', borderRadius: 999 },
+  registeredRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  registeredBadge: {
+    flex: 1, height: 48, backgroundColor: '#F0FDF4', borderRadius: 999,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#BBF7D0',
+  },
+  registeredBadgeText: { fontSize: 14, fontWeight: '700', color: '#16A34A' },
+  unregisterBtn: {
+    height: 48, paddingHorizontal: 18, backgroundColor: '#FEF2F2', borderRadius: 999,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FECACA',
+  },
+  unregisterText: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
 });

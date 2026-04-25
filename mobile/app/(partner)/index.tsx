@@ -1,16 +1,71 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
+import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 
 export default function PartnerDashboard() {
   const [partnerId, setPartnerId] = useState('');
   const [partnerName, setPartnerName] = useState('');
+  const [tokenBalance, setTokenBalance] = useState(0);
+
+  const loadBalance = useCallback(async (id: string) => {
+    if (!id) return;
+
+    if (FIREBASE_CONFIGURED && db) {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const snap = await getDoc(doc(db, 'partners', id));
+        if (snap.exists()) {
+          setTokenBalance(snap.data().tokenBalance ?? 0);
+          return;
+        }
+      } catch {}
+    }
+
+    // Local fallback
+    const raw = await AsyncStorage.getItem('partner_balances');
+    if (raw) {
+      const balances: Record<string, number> = JSON.parse(raw);
+      setTokenBalance(balances[id] ?? 0);
+    }
+  }, []);
 
   useEffect(() => {
-    AsyncStorage.getItem('partnerId').then((v) => setPartnerId(v ?? ''));
-    AsyncStorage.getItem('partnerName').then((v) => setPartnerName(v ?? ''));
-  }, []);
+    Promise.all([
+      AsyncStorage.getItem('partnerId'),
+      AsyncStorage.getItem('partnerName'),
+    ]).then(([id, name]) => {
+      const pid = id ?? '';
+      const pname = name ?? '';
+      setPartnerId(pid);
+      setPartnerName(pname);
+      loadBalance(pid);
+    });
+  }, [loadBalance]);
+
+  // Refresh balance every time the tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (partnerId) loadBalance(partnerId);
+    }, [partnerId, loadBalance])
+  );
+
+  // Firebase real-time listener
+  useEffect(() => {
+    if (!partnerId || !FIREBASE_CONFIGURED || !db) return;
+    const setupListener = async () => {
+      const { doc, onSnapshot } = await import('firebase/firestore');
+      const unsub = onSnapshot(doc(db!, 'partners', partnerId), (snap) => {
+        if (snap.exists()) setTokenBalance(snap.data().tokenBalance ?? 0);
+      });
+      return unsub;
+    };
+    let unsub: (() => void) | undefined;
+    setupListener().then((fn) => { unsub = fn; });
+    return () => { unsub?.(); };
+  }, [partnerId]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -39,8 +94,8 @@ export default function PartnerDashboard() {
 
       {/* Balance card */}
       <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>TOKEN BALANCE</Text>
-        <Text style={styles.balanceValue}>0</Text>
+        <Text style={styles.balanceLabel}>TOKEN BALANCE RECEIVED</Text>
+        <Text style={styles.balanceValue}>{tokenBalance}</Text>
         <View style={styles.liveRow}>
           <View style={styles.liveDot} />
           <Text style={styles.liveText}>Live</Text>

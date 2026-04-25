@@ -1,13 +1,13 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, Modal,
+  View, Text, StyleSheet, TouchableOpacity, Alert, Modal,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { saveUserSnapshot } from '@/lib/userStore';
 import { useWallet } from '@/hooks/useWallet';
-import { ACTIVITIES } from '@/data/activities';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 // ─── weather ─────────────────────────────────────────────────────────────────
@@ -42,10 +42,16 @@ const PARTNER_MARKERS = [
 ];
 
 const ACTIVITY_MARKERS = [
-  { id: 'activity-paragliding',   name: 'Paragliding',     emoji: '🪂', lat: 46.6887, lon: 7.8490 },
-  { id: 'activity-eiger-trail',   name: 'Eiger Trail',     emoji: '⛰️', lat: 46.5781, lon: 8.0053 },
-  { id: 'activity-glacier-walk',  name: 'Glacier Walk',    emoji: '🧊', lat: 46.6241, lon: 8.0411 },
-  { id: 'activity-boat-tour',     name: 'Lake Thun Boat',  emoji: '⛵', lat: 46.7523, lon: 7.6264 },
+  { id: 'activity-paragliding',      name: 'Paragliding',         emoji: '🪂', lat: 46.6887, lon: 7.8490 },
+  { id: 'activity-eiger-trail',      name: 'Eiger Trail',         emoji: '⛰️', lat: 46.5781, lon: 8.0053 },
+  { id: 'activity-glacier-walk',     name: 'Glacier Walk',        emoji: '🧊', lat: 46.6241, lon: 8.0411 },
+  { id: 'activity-boat-tour',        name: 'Lake Thun Boat',      emoji: '⛵', lat: 46.7523, lon: 7.6264 },
+  { id: 'activity-jungfraujoch',     name: 'Jungfraujoch',        emoji: '🏔', lat: 46.5474, lon: 7.9854 },
+  { id: 'activity-schilthorn',       name: 'Schilthorn',          emoji: '🚡', lat: 46.5582, lon: 7.8389 },
+  { id: 'activity-first-cliff-walk', name: 'First Cliff Walk',    emoji: '🪜', lat: 46.6467, lon: 8.0677 },
+  { id: 'activity-canyon-swing',     name: 'Canyon Swing',        emoji: '🎢', lat: 46.6820, lon: 7.8510 },
+  { id: 'activity-harder-kulm',      name: 'Harder Kulm',         emoji: '🌉', lat: 46.6961, lon: 7.8580 },
+  { id: 'activity-lauterbrunnen',    name: 'Lauterbrunnen Valley', emoji: '💦', lat: 46.5935, lon: 7.9088 },
 ];
 
 const QUEST_LOCATIONS = [
@@ -127,6 +133,7 @@ export default function MapScreen() {
       w.pointsBalance = (w.pointsBalance ?? 0) + questModal.reward;
       await AsyncStorage.setItem('wallet_data', JSON.stringify(w));
     }
+    await saveUserSnapshot();
     setQuestModal(null);
     Alert.alert('🗺 Location Discovered!', `+${questModal.reward} discovery points added to your wallet.`);
   };
@@ -207,9 +214,9 @@ export default function MapScreen() {
       <View style={styles.topOverlay}>
         <View style={styles.headerCard}>
           <View style={styles.headerLeft}>
-            <View style={styles.avatarCircle}>
+            <TouchableOpacity style={styles.avatarCircle} onPress={() => router.push('/(guest)/profile' as any)} activeOpacity={0.8}>
               <Text style={styles.avatarInitial}>{initial}</Text>
-            </View>
+            </TouchableOpacity>
             <View>
               <Text style={styles.headerName}>Hi, {name}</Text>
               {weather && <Text style={styles.headerWeather}>{weather.emoji} {weather.temp}°C · Interlaken</Text>}
@@ -255,16 +262,6 @@ export default function MapScreen() {
             <Text style={styles.payBtnText}>Pay / Scan</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.discoverRow}>
-          {ACTIVITIES.map(a => (
-            <TouchableOpacity key={a.id} style={styles.discoverChip} onPress={() => router.push('/(guest)/activities' as any)} activeOpacity={0.8}>
-              {a.imageUrl && <Image source={{ uri: a.imageUrl }} style={styles.chipImg} resizeMode="cover" />}
-              <View style={styles.chipOverlay} />
-              {registeredActivities.has(a.id) && <View style={styles.chipBooked}><Text style={styles.chipBookedText}>✓</Text></View>}
-              <Text style={styles.chipText} numberOfLines={1}>{a.title}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
       </View>
 
       {/* ── Quest discovery modal ── */}
@@ -368,7 +365,7 @@ const styles = StyleSheet.create({
 
   // locate button
   locBtn: {
-    position: 'absolute', right: 16, bottom: 220,
+    position: 'absolute', right: 16, bottom: 175,
     width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
@@ -376,11 +373,10 @@ const styles = StyleSheet.create({
 
   // bottom card
   bottomCard: {
-    position: 'absolute', bottom: 98, left: 16, right: 16,
+    position: 'absolute', bottom: 72, left: 16, right: 16,
     backgroundColor: '#FFFFFF', borderRadius: 24,
-    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
+    paddingHorizontal: 20, paddingVertical: 14,
     shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 10,
-    gap: 8,
   },
   balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   balanceLabel: { fontSize: 10, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1.5 },
@@ -389,17 +385,6 @@ const styles = StyleSheet.create({
   balanceCoin: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
   payBtn: { backgroundColor: '#14532D', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 11 },
   payBtnText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
-  discoverRow: { gap: 10, paddingRight: 4 },
-  discoverChip: { width: 110, height: 58, borderRadius: 14, overflow: 'hidden', backgroundColor: '#F3F4F6' },
-  chipImg: { width: '100%', height: '100%', position: 'absolute' },
-  chipOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.38)' },
-  chipBooked: {
-    position: 'absolute', top: 6, right: 6,
-    backgroundColor: '#84CC16', borderRadius: 999, width: 18, height: 18,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  chipBookedText: { fontSize: 10, fontWeight: '900', color: '#111827' },
-  chipText: { position: 'absolute', bottom: 7, left: 8, right: 8, fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
 
   // quest modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },

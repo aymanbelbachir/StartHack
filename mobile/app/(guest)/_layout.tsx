@@ -54,13 +54,13 @@ export default function GuestLayout() {
         tabBarShowLabel: false,
         tabBarStyle: {
           position: 'absolute',
-          bottom: 28,
+          bottom: 8,
           left: 20,
           right: 20,
           borderRadius: 999,
           backgroundColor: '#0D2818',
           borderTopWidth: 0,
-          height: 70,
+          height: 64,
           paddingBottom: 0,
           paddingTop: 0,
           elevation: 16,
@@ -103,6 +103,10 @@ export default function GuestLayout() {
       <Tabs.Screen
         name="history"
         options={{ headerShown: false, tabBarIcon: ({ focused }) => <TabIcon Icon={ClockIcon} focused={focused} /> }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{ href: null, headerShown: false }}
       />
     </Tabs>
   );

@@ -7,6 +7,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
+import { saveUserSnapshot } from '@/lib/userStore';
+import { getAvailability, createBooking } from '@/lib/bookingStore';
+import type { Availability, Booking } from '@/lib/bookingStore';
+import QRCode from 'react-native-qrcode-svg';
 import type { WalletData } from '@/hooks/useWallet';
 import { useTransactions } from '@/hooks/useTransactions';
 import type { Transaction } from '@/hooks/useTransactions';
@@ -94,6 +98,23 @@ const PARTNERS = [
   { id: 'partner-bakery', name: 'Grindelwald Bäckerei', type: 'Food & Drink', color: '#D97706', imageUrl: 'https://images.unsplash.com/photo-1753011767176-7602e5e8619a?w=400&q=80' },
 ];
 
+// ─── date helpers ─────────────────────────────────────────────────────────────
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatDateLabel(d: Date) {
+  return `${DAY_LABELS[d.getDay()]} ${d.getDate()} ${MONTH_LABELS[d.getMonth()]}`;
+}
+function toISODate(d: Date) {
+  return d.toISOString().split('T')[0];
+}
+function addDays(d: Date, n: number) {
+  const r = new Date(d); r.setDate(r.getDate() + n); return r;
+}
+function nightsBetween(a: Date, b: Date) {
+  return Math.max(1, Math.round((b.getTime() - a.getTime()) / 86400000));
+}
+
 // ─── types ────────────────────────────────────────────────────────────────────
 interface SuccessInfo {
   partnerName: string;
@@ -151,7 +172,7 @@ export default function ScanScreen() {
   // ── existing state (unchanged) ──
   const [partnerId, setPartnerId] = useState('');
   const [amount, setAmount] = useState('');
-  const [mode, setMode] = useState<'pay' | 'redeem'>('pay');
+  const [mode, setMode] = useState<'pay' | 'redeem' | 'book'>('pay');
   const [loading, setLoading] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -165,6 +186,12 @@ export default function ScanScreen() {
   const [cameraActive, setCameraActive] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+
+  // booking state
+  const [checkIn, setCheckIn] = useState<Date>(() => addDays(new Date(), 1));
+  const [checkOut, setCheckOut] = useState<Date>(() => addDays(new Date(), 2));
+  const [availability, setAvailability] = useState<Availability | null>(null);
+  const [bookingConfirm, setBookingConfirm] = useState<Booking | null>(null);
 
   // ── spending chart data ──
   const { transactions } = useTransactions(userId);
@@ -242,6 +269,15 @@ export default function ScanScreen() {
       wallet.pointsBalance = (wallet.pointsBalance ?? 0) + 10;
     }
     await AsyncStorage.setItem('wallet_data', JSON.stringify(wallet));
+
+    // Credit the partner's balance
+    if (mode === 'pay' && tokenAmt > 0) {
+      const rawBalances = await AsyncStorage.getItem('partner_balances');
+      const balances: Record<string, number> = rawBalances ? JSON.parse(rawBalances) : {};
+      balances[partnerId] = (balances[partnerId] ?? 0) + tokenAmt;
+      await AsyncStorage.setItem('partner_balances', JSON.stringify(balances));
+    }
+
     const txId = `tx-${Date.now()}`;
     const tx = {
       id: txId, fromUserId: userId, toPartnerId: partnerId,
@@ -251,19 +287,24 @@ export default function ScanScreen() {
     };
     const existing = JSON.parse((await AsyncStorage.getItem('transactions')) ?? '[]');
     await AsyncStorage.setItem('transactions', JSON.stringify([tx, ...existing]));
+    await saveUserSnapshot();
     showSuccess({ partnerName, amount: tokenAmt, points: mode === 'pay' ? 10 : 0, txId, timestamp: new Date().toLocaleString(), mode });
   };
 
   const processFirebaseTransaction = async (userId: string, partnerName: string, tokenAmt: number) => {
     try {
-      const { collection, addDoc, doc, updateDoc, getDoc, serverTimestamp } = await import('firebase/firestore');
+      const { collection, addDoc, doc, updateDoc, getDoc, setDoc, increment, serverTimestamp } = await import('firebase/firestore');
       const userRef = doc(db!, 'users', userId);
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) throw new Error('User not found');
       const data = userSnap.data();
       if (mode === 'pay') {
         if (data.tokenBalance < tokenAmt) throw new Error(`Insufficient tokens (balance: ${data.tokenBalance})`);
+        // Deduct from guest
         await updateDoc(userRef, { tokenBalance: data.tokenBalance - tokenAmt, pointsBalance: (data.pointsBalance ?? 0) + 10 });
+        // Credit partner — create or update partner document
+        const partnerRef = doc(db!, 'partners', partnerId);
+        await setDoc(partnerRef, { tokenBalance: increment(tokenAmt), name: partnerName }, { merge: true });
       }
       const docRef = await addDoc(collection(db!, 'transactions'), {
         fromUserId: userId, toPartnerId: partnerId,
@@ -327,7 +368,73 @@ export default function ScanScreen() {
     setPartnerId(p.id);
     setSelectedPartner({ id: p.id, name: p.name, color: p.color });
     setAmount('');
+    setAvailability(null);
+    setCheckIn(addDays(new Date(), 1));
+    setCheckOut(addDays(new Date(), 2));
+    getAvailability(p.id).then(setAvailability);
     setModalVisible(true);
+  };
+
+  // ── book hotel ──
+  const handleBook = async () => {
+    if (!availability?.enabled) { Alert.alert('Not available', 'This partner is not accepting bookings.'); return; }
+    const roomsLeft = availability.maxRooms - availability.bookedRooms;
+    if (roomsLeft <= 0) { Alert.alert('Sold out', 'No rooms available for these dates.'); return; }
+    const nights = nightsBetween(checkIn, checkOut);
+    const total = nights * (availability.pricePerNight ?? 0);
+    const raw = await AsyncStorage.getItem('wallet_data');
+    if (!raw) return;
+    const wallet = JSON.parse(raw);
+    if (wallet.tokenBalance < total) {
+      Alert.alert('Insufficient tokens', `You need ${total} tokens but have ${wallet.tokenBalance}.`);
+      return;
+    }
+    Alert.alert(
+      'Confirm Booking',
+      `${selectedPartner?.name}\n${formatDateLabel(checkIn)} → ${formatDateLabel(checkOut)}\n${nights} night${nights > 1 ? 's' : ''} · ${total} tokens`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Book Now',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              // Debit guest wallet
+              wallet.tokenBalance -= total;
+              await AsyncStorage.setItem('wallet_data', JSON.stringify(wallet));
+              // Credit partner (local)
+              const rawBalances = await AsyncStorage.getItem('partner_balances');
+              const balances: Record<string, number> = rawBalances ? JSON.parse(rawBalances) : {};
+              balances[partnerId] = (balances[partnerId] ?? 0) + total;
+              await AsyncStorage.setItem('partner_balances', JSON.stringify(balances));
+              // Sync to Firestore (keeps home screen balance live)
+              if (FIREBASE_CONFIGURED && db && userId) {
+                const { doc, updateDoc, setDoc, increment } = await import('firebase/firestore');
+                await updateDoc(doc(db!, 'users', userId), { tokenBalance: wallet.tokenBalance });
+                await setDoc(doc(db!, 'partners', partnerId), { tokenBalance: increment(total) }, { merge: true });
+              }
+              // Create booking
+              const booking = await createBooking({
+                userId: userId ?? 'guest',
+                guestName: wallet.name ?? 'Guest',
+                partnerId,
+                partnerName: selectedPartner?.name ?? '',
+                checkIn: toISODate(checkIn),
+                checkOut: toISODate(checkOut),
+                totalTokens: total,
+              });
+              await saveUserSnapshot();
+              setModalVisible(false);
+              setBookingConfirm(booking);
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Booking failed');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const filteredPartners = PARTNERS.filter(p =>
@@ -492,6 +599,71 @@ export default function ScanScreen() {
           </ScrollView>
         )}
 
+        {/* booking confirmation modal */}
+        <Modal
+          visible={!!bookingConfirm}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setBookingConfirm(null)}
+        >
+          <View style={s.confirmOverlay}>
+            <View style={s.confirmSheet}>
+              <Text style={s.confirmTitle}>Booking Confirmed!</Text>
+              <Text style={s.confirmSub}>Show this QR code at check-in</Text>
+
+              {bookingConfirm && (
+                <View style={s.qrWrap}>
+                  <QRCode
+                    value={bookingConfirm.confirmationCode}
+                    size={180}
+                    color="#111827"
+                    backgroundColor="#FFFFFF"
+                  />
+                </View>
+              )}
+
+              <View style={s.confirmCodePill}>
+                <Text style={s.confirmCodeText}>{bookingConfirm?.confirmationCode}</Text>
+              </View>
+
+              <View style={s.confirmDetails}>
+                <View style={s.confirmRow}>
+                  <Text style={s.confirmRowLabel}>Hotel</Text>
+                  <Text style={s.confirmRowVal}>{bookingConfirm?.partnerName}</Text>
+                </View>
+                <View style={s.confirmRow}>
+                  <Text style={s.confirmRowLabel}>Guest</Text>
+                  <Text style={s.confirmRowVal}>{bookingConfirm?.guestName}</Text>
+                </View>
+                <View style={s.confirmRow}>
+                  <Text style={s.confirmRowLabel}>Check-in</Text>
+                  <Text style={s.confirmRowVal}>{bookingConfirm?.checkIn}</Text>
+                </View>
+                <View style={s.confirmRow}>
+                  <Text style={s.confirmRowLabel}>Check-out</Text>
+                  <Text style={s.confirmRowVal}>{bookingConfirm?.checkOut}</Text>
+                </View>
+                <View style={s.confirmRow}>
+                  <Text style={s.confirmRowLabel}>Nights</Text>
+                  <Text style={s.confirmRowVal}>{bookingConfirm?.nights}</Text>
+                </View>
+                <View style={[s.confirmRow, s.confirmRowTotal]}>
+                  <Text style={s.confirmTotalLabel}>Total Paid</Text>
+                  <Text style={s.confirmTotalVal}>{bookingConfirm?.totalTokens} 🪙</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={s.confirmDoneBtn}
+                onPress={() => setBookingConfirm(null)}
+                activeOpacity={0.85}
+              >
+                <Text style={s.confirmDoneBtnText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* payment modal */}
         <Modal
           visible={modalVisible}
@@ -514,14 +686,14 @@ export default function ScanScreen() {
 
               {/* mode toggle */}
               <View style={s.modalModeRow}>
-                {(['pay', 'redeem'] as const).map(m => (
+                {(['pay', 'redeem', 'book'] as const).map(m => (
                   <TouchableOpacity
                     key={m}
                     style={[s.modeBtn, mode === m && s.modeBtnActive]}
                     onPress={() => setMode(m)}
                   >
                     <Text style={[s.modeBtnText, mode === m && s.modeBtnTextActive]}>
-                      {m === 'pay' ? 'Pay' : 'Redeem'}
+                      {m === 'pay' ? 'Pay' : m === 'redeem' ? 'Redeem' : 'Book'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -553,14 +725,65 @@ export default function ScanScreen() {
                 </>
               )}
 
+              {mode === 'book' && (
+                <>
+                  {availability?.enabled === false && (
+                    <View style={s.noAvailBanner}>
+                      <Text style={s.noAvailText}>⚠️ This partner is not accepting bookings</Text>
+                    </View>
+                  )}
+                  {availability?.enabled && availability.maxRooms - availability.bookedRooms <= 0 && (
+                    <View style={s.noAvailBanner}>
+                      <Text style={s.noAvailText}>🚫 Sold out — no rooms available</Text>
+                    </View>
+                  )}
+                  {availability?.enabled && availability.maxRooms - availability.bookedRooms > 0 && (
+                    <View style={s.availBanner}>
+                      <Text style={s.availText}>✅ {availability.maxRooms - availability.bookedRooms} room{availability.maxRooms - availability.bookedRooms > 1 ? 's' : ''} available · {availability.pricePerNight} tokens/night</Text>
+                    </View>
+                  )}
+                  {/* Check-in */}
+                  <Text style={s.amtLabel}>Check-in</Text>
+                  <View style={s.datePicker}>
+                    <TouchableOpacity style={s.dateArrow} onPress={() => setCheckIn(d => addDays(d, -1))}>
+                      <Text style={s.dateArrowText}>‹</Text>
+                    </TouchableOpacity>
+                    <Text style={s.dateLabel}>{formatDateLabel(checkIn)}</Text>
+                    <TouchableOpacity style={s.dateArrow} onPress={() => setCheckIn(d => addDays(d, 1))}>
+                      <Text style={s.dateArrowText}>›</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {/* Check-out */}
+                  <Text style={s.amtLabel}>Check-out</Text>
+                  <View style={s.datePicker}>
+                    <TouchableOpacity style={s.dateArrow} onPress={() => setCheckOut(d => { const min = addDays(checkIn, 1); const next = addDays(d, -1); return next <= checkIn ? min : next; })}>
+                      <Text style={s.dateArrowText}>‹</Text>
+                    </TouchableOpacity>
+                    <Text style={s.dateLabel}>{formatDateLabel(checkOut)}</Text>
+                    <TouchableOpacity style={s.dateArrow} onPress={() => setCheckOut(d => addDays(d, 1))}>
+                      <Text style={s.dateArrowText}>›</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {/* Summary */}
+                  <View style={s.bookSummary}>
+                    <Text style={s.bookSummaryText}>
+                      {nightsBetween(checkIn, checkOut)} night{nightsBetween(checkIn, checkOut) > 1 ? 's' : ''}
+                    </Text>
+                    <Text style={s.bookSummaryTotal}>
+                      {nightsBetween(checkIn, checkOut) * (availability?.pricePerNight ?? 0)} 🪙
+                    </Text>
+                  </View>
+                </>
+              )}
+
               <TouchableOpacity
                 style={[s.confirmBtn, loading && { opacity: 0.5 }]}
-                onPress={handleAction}
+                onPress={mode === 'book' ? handleBook : handleAction}
                 disabled={loading}
                 activeOpacity={0.85}
               >
                 <Text style={s.confirmBtnText}>
-                  {loading ? 'Processing...' : mode === 'pay' ? 'Confirm Payment' : 'Confirm Redemption'}
+                  {loading ? 'Processing...' : mode === 'pay' ? 'Confirm Payment' : mode === 'redeem' ? 'Confirm Redemption' : 'Book Now'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -709,4 +932,57 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   confirmBtnText: { fontSize: 15, fontWeight: '800', color: '#111827' },
+
+  // date picker
+  datePicker: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#2A2A2A', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 4,
+  },
+  dateArrow: { paddingHorizontal: 16, paddingVertical: 4 },
+  dateArrowText: { fontSize: 24, color: '#A3E635', fontWeight: '600' },
+  dateLabel: { fontSize: 14, fontWeight: '600', color: '#FFFFFF', flex: 1, textAlign: 'center' },
+
+  // availability banners
+  noAvailBanner: { backgroundColor: '#3A1515', borderRadius: 12, padding: 12 },
+  noAvailText: { fontSize: 13, color: '#F87171', textAlign: 'center' },
+  availBanner: { backgroundColor: '#1A2E1A', borderRadius: 12, padding: 12 },
+  availText: { fontSize: 13, color: '#86EFAC', textAlign: 'center' },
+
+  // booking summary row
+  bookSummary: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#2A2A2A', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+  },
+  bookSummaryText: { fontSize: 13, color: '#9CA3AF' },
+  bookSummaryTotal: { fontSize: 16, fontWeight: '800', color: '#A3E635' },
+
+  // booking confirmation modal
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
+  confirmSheet: {
+    backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 24, paddingTop: 28, paddingBottom: 48, alignItems: 'center', gap: 14,
+  },
+  confirmTitle: { fontSize: 24, fontWeight: '800', color: '#111827' },
+  confirmSub: { fontSize: 14, color: '#6B7280', marginBottom: 4 },
+  qrWrap: {
+    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4,
+    borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  confirmCodePill: {
+    backgroundColor: '#84CC16', borderRadius: 999, paddingHorizontal: 20, paddingVertical: 8,
+  },
+  confirmCodeText: { fontSize: 16, fontWeight: '800', color: '#111827', letterSpacing: 2 },
+  confirmDetails: { width: '100%', backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, gap: 8 },
+  confirmRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  confirmRowLabel: { fontSize: 13, color: '#6B7280' },
+  confirmRowVal: { fontSize: 13, fontWeight: '600', color: '#111827' },
+  confirmRowTotal: { borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 8, marginTop: 4 },
+  confirmTotalLabel: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  confirmTotalVal: { fontSize: 15, fontWeight: '800', color: '#059669' },
+  confirmDoneBtn: {
+    width: '100%', backgroundColor: '#111827', borderRadius: 16,
+    paddingVertical: 16, alignItems: 'center',
+  },
+  confirmDoneBtnText: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
 });

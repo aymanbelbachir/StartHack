@@ -74,10 +74,23 @@ export function usePartnerTransactions(partnerId: string | null) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!partnerId || !FIREBASE_CONFIGURED || !db) {
-      setLoading(false);
+    if (!partnerId) { setLoading(false); return; }
+
+    if (!FIREBASE_CONFIGURED || !db) {
+      // Local fallback: read from shared transactions storage
+      AsyncStorage.getItem('transactions').then((raw) => {
+        if (raw) {
+          const all: Transaction[] = JSON.parse(raw);
+          const filtered = all
+            .filter((tx) => tx.toPartnerId === partnerId)
+            .sort((a, b) => new Date(b.timestamp as string).getTime() - new Date(a.timestamp as string).getTime());
+          setTransactions(filtered);
+        }
+        setLoading(false);
+      });
       return;
     }
+
     const { collection, query, where, onSnapshot, limit } = require('firebase/firestore');
     const q = query(
       collection(db, 'transactions'),
@@ -85,7 +98,13 @@ export function usePartnerTransactions(partnerId: string | null) {
       limit(50)
     );
     const unsub = onSnapshot(q, (snap: any) => {
-      setTransactions(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Transaction)));
+      const txs = snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Transaction));
+      txs.sort((a: any, b: any) => {
+        const ta = a.timestamp?.toMillis?.() ?? new Date(a.timestamp).getTime();
+        const tb = b.timestamp?.toMillis?.() ?? new Date(b.timestamp).getTime();
+        return tb - ta;
+      });
+      setTransactions(txs);
       setLoading(false);
     });
     return unsub;
