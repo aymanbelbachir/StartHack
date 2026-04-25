@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import type { Activity } from '@/data/activities';
 
 interface ActivityCardProps {
@@ -9,31 +8,54 @@ interface ActivityCardProps {
   onRegister?: () => void;
 }
 
+const CATEGORY_BG: Record<string, string> = {
+  Adventure: '#14532D',
+  Hiking:    '#0F766E',
+  Nature:    '#065F46',
+  Leisure:   '#1D4ED8',
+};
+
 export function ActivityCard({ activity, registered = false, onRegister }: ActivityCardProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
+  const heroBg = CATEGORY_BG[activity.category] ?? '#14532D';
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.header}>
-        <Text style={styles.emoji}>{activity.imageEmoji}</Text>
-        <View style={styles.meta}>
-          <Text style={[styles.category, { color: colors.primary, backgroundColor: colors.primary + '20' }]}>
-            {activity.category}
-          </Text>
-          <Text style={[styles.duration, { color: colors.icon }]}>⏱ {activity.duration}</Text>
+    <View style={styles.card}>
+      <View style={[styles.hero, { backgroundColor: heroBg }]}>
+        <Text style={styles.heroEmoji}>{activity.imageEmoji}</Text>
+        <View style={styles.catBadge}>
+          <Text style={styles.catText}>{activity.category}</Text>
         </View>
       </View>
-      <Text style={[styles.title, { color: colors.text }]}>{activity.title}</Text>
-      <Text style={[styles.description, { color: colors.icon }]}>{activity.description}</Text>
-      <View style={styles.footer}>
-        <Text style={[styles.points, { color: colors.points }]}>+{activity.pointsReward} pts ⭐</Text>
+
+      <View style={styles.content}>
+        <Text style={styles.title}>{activity.title}</Text>
+
+        <View style={styles.stats}>
+          <View style={styles.statPill}>
+            <Text style={styles.statLabel}>Location</Text>
+            <Text style={styles.statValue}>{activity.location}</Text>
+          </View>
+          <View style={styles.statPill}>
+            <Text style={styles.statLabel}>Duration</Text>
+            <Text style={styles.statValue}>{activity.duration}</Text>
+          </View>
+          <View style={styles.statPill}>
+            <Text style={styles.statLabel}>Reward</Text>
+            <Text style={[styles.statValue, styles.statLime]}>+{activity.pointsReward} pts</Text>
+          </View>
+        </View>
+
+        <Text style={styles.description} numberOfLines={2}>{activity.description}</Text>
+
         <TouchableOpacity
-          style={[styles.btn, { backgroundColor: registered ? colors.success : colors.accent }]}
+          style={[styles.btn, registered && styles.btnDone]}
           onPress={!registered ? onRegister : undefined}
           disabled={registered}
+          activeOpacity={0.8}
         >
-          <Text style={styles.btnText}>{registered ? '✓ Registered' : 'Register'}</Text>
+          <Text style={[styles.btnText, registered && styles.btnDoneText]}>
+            {registered ? '✓ Registered' : 'Register'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -42,26 +64,26 @@ export function ActivityCard({ activity, registered = false, onRegister }: Activ
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    gap: 8,
+    backgroundColor: '#FFFFFF', borderRadius: 24, overflow: 'hidden', marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3,
   },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  emoji: { fontSize: 36 },
-  meta: { alignItems: 'flex-end', gap: 4 },
-  category: { fontSize: 11, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  duration: { fontSize: 12 },
-  title: { fontSize: 17, fontWeight: '700' },
-  description: { fontSize: 13, lineHeight: 18 },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  points: { fontSize: 15, fontWeight: '700' },
-  btn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 },
-  btnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  hero: { height: 144, alignItems: 'center', justifyContent: 'center' },
+  heroEmoji: { fontSize: 54 },
+  catBadge: {
+    position: 'absolute', bottom: 10, left: 12,
+    backgroundColor: 'rgba(0,0,0,0.28)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  catText: { fontSize: 11, color: '#FFFFFF', fontWeight: '600' },
+  content: { padding: 16, gap: 12 },
+  title: { fontSize: 17, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
+  stats: { flexDirection: 'row', gap: 8 },
+  statPill: { flex: 1, backgroundColor: '#F3F4F6', borderRadius: 12, padding: 10, alignItems: 'center' },
+  statLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: '500' },
+  statValue: { fontSize: 12, fontWeight: '600', color: '#111827', marginTop: 2 },
+  statLime: { color: '#65A30D' },
+  description: { fontSize: 13, color: '#6B7280', lineHeight: 19 },
+  btn: { backgroundColor: '#84CC16', borderRadius: 999, height: 48, alignItems: 'center', justifyContent: 'center' },
+  btnDone: { backgroundColor: '#F3F4F6' },
+  btnText: { color: '#111827', fontSize: 14, fontWeight: '700' },
+  btnDoneText: { color: '#9CA3AF' },
 });

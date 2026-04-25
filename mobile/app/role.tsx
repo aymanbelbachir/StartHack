@@ -1,17 +1,7 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  useColorScheme,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, TouchableOpacity, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors } from '@/constants/Colors';
 import { Button } from '@/components/Button';
 
 const PARTNER_CREDENTIALS: Record<string, string> = {
@@ -22,17 +12,12 @@ const PARTNER_CREDENTIALS: Record<string, string> = {
 };
 
 export default function RoleScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
   const [partnerId, setPartnerId] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handlePartnerLogin = async () => {
     const name = PARTNER_CREDENTIALS[partnerId.toLowerCase()];
-    if (!name) {
-      Alert.alert('Invalid ID', 'Partner ID not found');
-      return;
-    }
+    if (!name) { Alert.alert('Invalid ID', 'Partner ID not found'); return; }
     setLoading(true);
     await AsyncStorage.setItem('partnerId', partnerId.toLowerCase());
     await AsyncStorage.setItem('partnerName', name);
@@ -41,38 +26,81 @@ export default function RoleScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Partner Login</Text>
-        <Text style={[styles.subtitle, { color: colors.icon }]}>
-          Enter your partner ID to access the dashboard
-        </Text>
+    <View style={styles.container}>
+      {/* Hero */}
+      <View style={styles.hero}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.heroLabel}>PARTNER ACCESS</Text>
+        <Text style={styles.heroTitle}>Partner{'\n'}Login</Text>
       </View>
-      <TextInput
-        style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-        value={partnerId}
-        onChangeText={setPartnerId}
-        placeholder="Partner ID (e.g. partner-jungfraujoch)"
-        placeholderTextColor={colors.icon}
-        autoCapitalize="none"
-      />
-      <Button title="Access Dashboard" onPress={handlePartnerLogin} loading={loading} />
-      <Button title="← Back" onPress={() => router.back()} variant="outline" style={{ marginTop: 8 }} />
-      <Text style={[styles.hint, { color: colors.icon }]}>
-        Demo IDs:{'\n'}partner-jungfraujoch · partner-victoria-restaurant{'\n'}partner-interlaken-adventure · partner-bakery
-      </Text>
-    </KeyboardAvoidingView>
+
+      {/* White sheet */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheet}>
+        <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Text style={styles.sheetTitle}>Enter your partner ID</Text>
+          <Text style={styles.sheetSub}>Access the partner dashboard to track transactions and confirm redemptions.</Text>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Partner ID</Text>
+            <TextInput
+              style={styles.input}
+              value={partnerId}
+              onChangeText={setPartnerId}
+              placeholder="e.g. partner-bakery"
+              placeholderTextColor="#D1D5DB"
+              autoCapitalize="none"
+            />
+          </View>
+
+          <Button title="Access Dashboard" onPress={handlePartnerLogin} loading={loading} />
+
+          <View style={styles.hintCard}>
+            <Text style={styles.hintTitle}>Demo Partner IDs</Text>
+            {Object.entries(PARTNER_CREDENTIALS).map(([id, name]) => (
+              <TouchableOpacity key={id} onPress={() => setPartnerId(id)} style={styles.hintRow}>
+                <Text style={styles.hintName}>{name}</Text>
+                <Text style={styles.hintId}>{id}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, paddingTop: 80, gap: 16 },
-  header: { gap: 8, marginBottom: 8 },
-  title: { fontSize: 28, fontWeight: '800' },
-  subtitle: { fontSize: 15 },
-  input: { height: 52, borderRadius: 12, borderWidth: 1, paddingHorizontal: 16, fontSize: 15 },
-  hint: { fontSize: 12, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  container: { flex: 1, backgroundColor: '#052e16' },
+  hero: {
+    flex: 1, justifyContent: 'flex-end',
+    paddingHorizontal: 32, paddingBottom: 44,
+  },
+  backBtn: { position: 'absolute', top: 56, left: 32 },
+  backText: { color: 'rgba(255,255,255,0.6)', fontSize: 15, fontWeight: '600' },
+  heroLabel: {
+    color: 'rgba(255,255,255,0.45)', fontSize: 11,
+    fontWeight: '700', letterSpacing: 5, marginBottom: 14,
+  },
+  heroTitle: { color: '#FFFFFF', fontSize: 50, fontWeight: '800', lineHeight: 56 },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    maxHeight: '60%',
+  },
+  sheetContent: { paddingHorizontal: 28, paddingTop: 28, paddingBottom: 40, gap: 16 },
+  sheetTitle: { fontSize: 22, fontWeight: '700', color: '#111827' },
+  sheetSub: { fontSize: 14, color: '#6B7280', lineHeight: 20, marginTop: -4 },
+  field: { gap: 6 },
+  fieldLabel: { fontSize: 12, fontWeight: '600', color: '#6B7280', letterSpacing: 0.3 },
+  input: {
+    height: 50, borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E7EB',
+    paddingHorizontal: 16, fontSize: 15, color: '#111827', backgroundColor: '#F9FAFB',
+  },
+  hintCard: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, gap: 4 },
+  hintTitle: { fontSize: 12, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' },
+  hintRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  hintName: { fontSize: 13, fontWeight: '600', color: '#111827' },
+  hintId: { fontSize: 11, color: '#9CA3AF', marginTop: 1 },
 });

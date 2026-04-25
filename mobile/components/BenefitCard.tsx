@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import type { Benefit } from '@/data/benefits';
 
 interface BenefitCardProps {
@@ -9,52 +8,63 @@ interface BenefitCardProps {
   onRedeem?: () => void;
 }
 
+const ICON_BG = ['#14532D', '#92400E', '#1E40AF', '#5B21B6'];
+
 export function BenefitCard({ benefit, redeemed = false, onRedeem }: BenefitCardProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
+  const isOneTime = benefit.discountType === 'one_time';
+  const idx = parseInt(benefit.id.replace('benefit-', '')) - 1;
+  const iconBg = ICON_BG[idx % ICON_BG.length] ?? '#14532D';
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, opacity: redeemed ? 0.5 : 1 }]}>
-      <Text style={styles.emoji}>{benefit.emoji}</Text>
-      <View style={styles.info}>
-        <Text style={[styles.title, { color: colors.text }]}>{benefit.title}</Text>
-        <Text style={[styles.description, { color: colors.icon }]}>{benefit.description}</Text>
-        <Text style={[styles.partner, { color: colors.primary }]}>@ {benefit.partnerName}</Text>
+    <View style={[styles.card, redeemed && styles.cardUsed]}>
+      <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
+        <Text style={styles.emoji}>{benefit.emoji}</Text>
       </View>
-      {!redeemed && onRedeem && (
-        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={onRedeem}>
-          <Text style={styles.btnText}>Redeem</Text>
-        </TouchableOpacity>
-      )}
-      {redeemed && (
-        <View style={[styles.btn, { backgroundColor: colors.border }]}>
-          <Text style={[styles.btnText, { color: colors.icon }]}>Used</Text>
+
+      <View style={styles.middle}>
+        <Text style={styles.title} numberOfLines={2}>{benefit.title}</Text>
+        <Text style={styles.partner}>{benefit.partnerName}</Text>
+        <View style={[styles.typeBadge, isOneTime ? styles.badgeAmber : styles.badgeBlue]}>
+          <Text style={[styles.typeBadgeText, isOneTime ? styles.textAmber : styles.textBlue]}>
+            {isOneTime ? 'One-time' : 'Multi-use'}
+          </Text>
         </View>
-      )}
+      </View>
+
+      <TouchableOpacity
+        style={[styles.btn, redeemed && styles.btnUsed]}
+        onPress={!redeemed ? onRedeem : undefined}
+        disabled={redeemed}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.btnText, redeemed && styles.btnUsedText]}>
+          {redeemed ? 'Used' : 'Redeem'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    gap: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#FFFFFF', borderRadius: 24, padding: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
-  emoji: { fontSize: 32 },
-  info: { flex: 1 },
-  title: { fontSize: 15, fontWeight: '700' },
-  description: { fontSize: 12, marginTop: 2 },
-  partner: { fontSize: 12, fontWeight: '600', marginTop: 4 },
-  btn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
-  btnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  cardUsed: { opacity: 0.55 },
+  iconBox: { width: 64, height: 64, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  emoji: { fontSize: 28 },
+  middle: { flex: 1, gap: 3 },
+  title: { fontSize: 14, fontWeight: '600', color: '#111827', lineHeight: 19 },
+  partner: { fontSize: 12, color: '#9CA3AF' },
+  typeBadge: { marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  badgeAmber: { backgroundColor: '#FEF3C7' },
+  badgeBlue: { backgroundColor: '#DBEAFE' },
+  typeBadgeText: { fontSize: 11, fontWeight: '600' },
+  textAmber: { color: '#92400E' },
+  textBlue: { color: '#1D4ED8' },
+  btn: { backgroundColor: '#84CC16', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  btnUsed: { backgroundColor: '#F3F4F6' },
+  btnText: { fontSize: 12, fontWeight: '700', color: '#111827' },
+  btnUsedText: { color: '#9CA3AF' },
 });

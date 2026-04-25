@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View, StyleSheet, useColorScheme } from 'react-native';
+import { ScrollView, Text, View, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors } from '@/constants/Colors';
 import { TransactionItem } from '@/components/TransactionItem';
 import { usePartnerTransactions } from '@/hooks/useTransactions';
 
 export default function PartnerTransactionsScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
   const [partnerId, setPartnerId] = useState<string | null>(null);
   const { transactions, loading } = usePartnerTransactions(partnerId);
 
@@ -16,16 +13,20 @@ export default function PartnerTransactionsScreen() {
   }, []);
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-    >
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Live Feed</Text>
+        <Text style={styles.sub}>Incoming payments & redemptions</Text>
+      </View>
+
       {loading ? (
-        <Text style={[styles.status, { color: colors.icon }]}>Loading...</Text>
+        <View style={styles.center}>
+          <Text style={styles.statusText}>Loading...</Text>
+        </View>
       ) : transactions.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyEmoji}>🔔</Text>
-          <Text style={[styles.status, { color: colors.icon }]}>Waiting for incoming payments...</Text>
+          <Text style={styles.emptyTitle}>Waiting for payments</Text>
+          <Text style={styles.emptyText}>Incoming transactions will appear here in real time</Text>
         </View>
       ) : (
         transactions.map((tx) => <TransactionItem key={tx.id} transaction={tx} />)
@@ -35,9 +36,18 @@ export default function PartnerTransactionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 16 },
-  empty: { alignItems: 'center', paddingTop: 80, gap: 16 },
-  emptyEmoji: { fontSize: 48 },
-  status: { fontSize: 15, textAlign: 'center' },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  content: { paddingHorizontal: 24, paddingBottom: 120 },
+  header: { paddingTop: 20, paddingBottom: 20, gap: 4 },
+  title: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  sub: { fontSize: 13, color: '#6B7280' },
+  center: { alignItems: 'center', paddingTop: 60 },
+  statusText: { fontSize: 15, color: '#6B7280' },
+  empty: {
+    backgroundColor: '#FFFFFF', borderRadius: 24, padding: 32,
+    alignItems: 'center', gap: 10, marginTop: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#374151' },
+  emptyText: { fontSize: 13, color: '#9CA3AF', textAlign: 'center', lineHeight: 20, maxWidth: 240 },
 });

@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, useColorScheme, Alert, View, Text } from 'react-native';
+import { ScrollView, StyleSheet, Alert, View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors } from '@/constants/Colors';
 import { ActivityCard } from '@/components/ActivityCard';
 import { ACTIVITIES } from '@/data/activities';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 
 export default function ActivitiesScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
   const [registered, setRegistered] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -26,7 +23,6 @@ export default function ActivitiesScreen() {
     setLoading(activityId);
     try {
       const userId = await AsyncStorage.getItem('userId') ?? '';
-
       if (FIREBASE_CONFIGURED && db) {
         const { doc, updateDoc, setDoc, arrayUnion, increment } = await import('firebase/firestore');
         const userRef = doc(db, 'users', userId);
@@ -43,12 +39,10 @@ export default function ActivitiesScreen() {
           await AsyncStorage.setItem('wallet_data', JSON.stringify(wallet));
         }
       }
-
       const newRegistered = new Set([...registered, activityId]);
       setRegistered(newRegistered);
       await AsyncStorage.setItem('registered_activities', JSON.stringify([...newRegistered]));
-
-      Alert.alert('Registered! 🎉', `You earned +${points} discovery points!`);
+      Alert.alert('Registered!', `You earned +${points} discovery points!`);
     } catch (e: any) {
       Alert.alert('Error', e.message ?? 'Registration failed');
     } finally {
@@ -57,13 +51,13 @@ export default function ActivitiesScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-    >
-      <Text style={[styles.header, { color: colors.icon }]}>
-        Register for activities to earn discovery points ⭐
-      </Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Discover</Text>
+        <Text style={styles.sub}>Register to earn discovery points</Text>
+      </View>
+
       {ACTIVITIES.map((activity) => (
         <ActivityCard
           key={activity.id}
@@ -77,7 +71,9 @@ export default function ActivitiesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 16, gap: 4 },
-  header: { fontSize: 13, textAlign: 'center', marginBottom: 8, lineHeight: 18 },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  content: { paddingHorizontal: 24, paddingBottom: 120 },
+  header: { paddingTop: 60, paddingBottom: 20, gap: 4 },
+  title: { fontSize: 32, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  sub: { fontSize: 13, color: '#6B7280' },
 });

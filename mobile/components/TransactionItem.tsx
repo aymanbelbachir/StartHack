@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, useColorScheme } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { View, Text, StyleSheet } from 'react-native';
 import type { Transaction } from '@/hooks/useTransactions';
 
 interface TransactionItemProps {
@@ -8,30 +7,33 @@ interface TransactionItemProps {
 }
 
 export function TransactionItem({ transaction }: TransactionItemProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
-
   const isPayment = transaction.type === 'payment';
-  const emoji = isPayment ? '🪙' : '🎁';
   const label = isPayment
-    ? `Paid at ${transaction.partnerName ?? 'partner'}`
-    : `Redeemed: ${transaction.benefitTitle ?? 'benefit'}`;
+    ? transaction.partnerName ?? 'Partner payment'
+    : transaction.benefitTitle ?? 'Benefit redemption';
+
+  const ts = transaction.timestamp;
+  const dateStr = ts instanceof Date
+    ? ts.toLocaleString()
+    : typeof ts === 'string'
+    ? new Date(ts).toLocaleString()
+    : 'Just now';
 
   return (
-    <View style={[styles.item, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <Text style={styles.emoji}>{emoji}</Text>
-      <View style={styles.details}>
-        <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
-        <Text style={[styles.time, { color: colors.icon }]}>
-          {transaction.timestamp instanceof Date
-            ? transaction.timestamp.toLocaleString()
-            : 'Just now'}
-        </Text>
+    <View style={styles.item}>
+      <View style={[styles.iconBox, isPayment ? styles.iconPay : styles.iconRedeem]}>
+        <Text style={styles.iconText}>{isPayment ? '↑' : '★'}</Text>
       </View>
-      <View style={styles.amounts}>
-        <Text style={[styles.tokens, { color: colors.token }]}>-{transaction.amount} 🪙</Text>
+      <View style={styles.details}>
+        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.time}>{dateStr}</Text>
+      </View>
+      <View style={styles.right}>
+        {transaction.amount > 0 && (
+          <Text style={styles.amount}>−{transaction.amount} T</Text>
+        )}
         {transaction.pointsAwarded > 0 && (
-          <Text style={[styles.points, { color: colors.points }]}>+{transaction.pointsAwarded} ⭐</Text>
+          <Text style={styles.points}>+{transaction.pointsAwarded} pts</Text>
         )}
       </View>
     </View>
@@ -40,19 +42,18 @@ export function TransactionItem({ transaction }: TransactionItemProps) {
 
 const styles = StyleSheet.create({
   item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 10,
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 14, marginBottom: 10, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
   },
-  emoji: { fontSize: 24 },
+  iconBox: { width: 42, height: 42, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  iconPay: { backgroundColor: '#84CC16' },
+  iconRedeem: { backgroundColor: '#F3F4F6' },
+  iconText: { fontSize: 16, fontWeight: '700', color: '#111827' },
   details: { flex: 1 },
-  label: { fontSize: 14, fontWeight: '600' },
-  time: { fontSize: 12, marginTop: 2 },
-  amounts: { alignItems: 'flex-end' },
-  tokens: { fontSize: 14, fontWeight: '700' },
-  points: { fontSize: 12, fontWeight: '600' },
+  label: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  time: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
+  right: { alignItems: 'flex-end', gap: 2 },
+  amount: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  points: { fontSize: 11, color: '#65A30D', fontWeight: '600' },
 });

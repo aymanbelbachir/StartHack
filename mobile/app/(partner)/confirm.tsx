@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, useColorScheme, Alert } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 
@@ -10,60 +9,80 @@ interface PendingRedemption {
 }
 
 export default function ConfirmScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
   const [pending, setPending] = useState<PendingRedemption | null>(null);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       {!pending ? (
         <View style={styles.waiting}>
-          <Text style={styles.waitingEmoji}>✅</Text>
-          <Text style={[styles.waitingTitle, { color: colors.text }]}>Waiting for redemption...</Text>
-          <Text style={[styles.waitingSubtitle, { color: colors.icon }]}>
-            When a guest redeems a benefit at your store, it will appear here for confirmation.
+          <View style={styles.waitingIcon}>
+            <Text style={styles.waitingEmoji}>✓</Text>
+          </View>
+          <Text style={styles.waitingTitle}>Ready to confirm</Text>
+          <Text style={styles.waitingSubtitle}>
+            When a guest redeems a benefit at your location, it will appear here for confirmation.
           </Text>
         </View>
       ) : (
-        <Card style={styles.confirmCard}>
-          <Text style={[styles.confirmTitle, { color: colors.text }]}>Redemption Request</Text>
-          <Text style={[styles.benefit, { color: colors.primary }]}>{pending.benefit}</Text>
-          <Text style={[styles.guest, { color: colors.icon }]}>Guest: {pending.guestId}</Text>
-          <View style={styles.actions}>
-            <Button
-              title="✓ Accept"
-              onPress={() => {
-                Alert.alert('Accepted', 'Benefit redeemed successfully!');
-                setPending(null);
-              }}
-              style={styles.acceptBtn}
-            />
-            <Button
-              title="✗ Reject"
-              onPress={() => {
-                Alert.alert('Rejected', 'Redemption rejected.');
-                setPending(null);
-              }}
-              variant="outline"
-              style={styles.rejectBtn}
-            />
-          </View>
-        </Card>
+        <View style={styles.confirmWrapper}>
+          <Card style={styles.confirmCard}>
+            <View style={styles.confirmHeader}>
+              <View style={styles.confirmDot} />
+              <Text style={styles.confirmTitle}>Redemption Request</Text>
+            </View>
+            <View style={styles.confirmBody}>
+              <Text style={styles.benefitLabel}>BENEFIT</Text>
+              <Text style={styles.benefit}>{pending.benefit}</Text>
+              <Text style={styles.guest}>Guest ID: {pending.guestId}</Text>
+            </View>
+            <View style={styles.actions}>
+              <Button
+                title="Accept"
+                onPress={() => {
+                  Alert.alert('Accepted', 'Benefit redeemed successfully!');
+                  setPending(null);
+                }}
+                style={styles.acceptBtn}
+              />
+              <Button
+                title="Reject"
+                onPress={() => {
+                  Alert.alert('Rejected', 'Redemption rejected.');
+                  setPending(null);
+                }}
+                variant="outline"
+                style={styles.rejectBtn}
+              />
+            </View>
+          </Card>
+        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24 },
-  waiting: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  waitingEmoji: { fontSize: 64 },
-  waitingTitle: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  waitingSubtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
-  confirmCard: { gap: 16 },
-  confirmTitle: { fontSize: 20, fontWeight: '700' },
-  benefit: { fontSize: 18, fontWeight: '600' },
-  guest: { fontSize: 14 },
+  container: { flex: 1, backgroundColor: '#F9FAFB', padding: 24, paddingBottom: 120 },
+
+  waiting: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24 },
+  waitingIcon: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 8,
+  },
+  waitingEmoji: { fontSize: 36, color: '#84CC16' },
+  waitingTitle: { fontSize: 20, fontWeight: '700', color: '#111827', textAlign: 'center' },
+  waitingSubtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 22, maxWidth: 280 },
+
+  confirmWrapper: { flex: 1, justifyContent: 'center' },
+  confirmCard: { gap: 20 },
+  confirmHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  confirmDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#84CC16' },
+  confirmTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  confirmBody: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, gap: 6 },
+  benefitLabel: { fontSize: 10, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1.5 },
+  benefit: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  guest: { fontSize: 12, color: '#9CA3AF', marginTop: 4 },
   actions: { flexDirection: 'row', gap: 12 },
   acceptBtn: { flex: 1 },
   rejectBtn: { flex: 1 },
