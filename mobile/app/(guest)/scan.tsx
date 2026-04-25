@@ -61,7 +61,7 @@ function SpendingChart({ data, labels }: { data: number[]; labels: string[] }) {
       <Path d={area} fill="#A3E635" fillOpacity={0.15} />
       <Path d={line} stroke="#A3E635" strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
       {pts.map((p, i) => (
-        <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill="#0D0D0D" stroke="#A3E635" strokeWidth={2} />
+        <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill="#FFFFFF" stroke="#A3E635" strokeWidth={2} />
       ))}
       {labels.map((label, i) => (
         <SvgText
@@ -383,7 +383,7 @@ export default function ScanScreen() {
   // ── main screen ──
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <View style={s.container}>
         {/* header */}
         <View style={s.header}>
@@ -601,30 +601,30 @@ const dark = StyleSheet.create({
 
 // ─── main styles ──────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
 
   header: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 4, alignItems: 'center', gap: 6 },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
   headerSub: { fontSize: 13, color: '#6B7280', textAlign: 'center' },
 
   tabRow: {
     flexDirection: 'row', marginHorizontal: 20, marginTop: 20,
-    backgroundColor: '#1A1A1A', borderRadius: 999, padding: 4, gap: 4,
+    backgroundColor: '#E5E7EB', borderRadius: 999, padding: 4, gap: 4,
   },
   tabBtn: { flex: 1, paddingVertical: 10, borderRadius: 999, alignItems: 'center' },
-  tabBtnActive: { backgroundColor: '#FFFFFF' },
+  tabBtnActive: { backgroundColor: '#111827' },
   tabText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-  tabTextActive: { color: '#111827' },
+  tabTextActive: { color: '#FFFFFF' },
 
   tabContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120, gap: 12 },
 
   viewfinder: {
-    height: 260, borderRadius: 24, backgroundColor: '#1A1A1A',
+    height: 260, borderRadius: 24, backgroundColor: '#E5E7EB',
     overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
   },
   vfInner: { alignItems: 'center', gap: 12 },
-  vfText: { fontSize: 13, color: '#4B5563' },
-  corner: { position: 'absolute', width: 28, height: 28, borderColor: '#FFFFFF', borderWidth: 2.5 },
+  vfText: { fontSize: 13, color: '#6B7280' },
+  corner: { position: 'absolute', width: 28, height: 28, borderColor: '#111827', borderWidth: 2.5 },
   cornerTL: { top: 16, left: 16, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 6 },
   cornerTR: { top: 16, right: 16, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 6 },
   cornerBL: { bottom: 16, left: 16, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 6 },
@@ -643,36 +643,39 @@ const s = StyleSheet.create({
   scanNowText: { fontSize: 15, fontWeight: '800', color: '#111827' },
 
   chartCard: {
-    backgroundColor: '#1A1A1A', borderRadius: 16,
+    backgroundColor: '#FFFFFF', borderRadius: 16,
     paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8,
     marginHorizontal: 20, marginTop: 10,
     alignItems: 'center', gap: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
   chartHeader: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  chartTitle: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  chartTitle: { fontSize: 12, fontWeight: '700', color: '#111827' },
   chartSub: { fontSize: 11, color: '#6B7280' },
 
   utilRow: { flexDirection: 'row', gap: 12 },
   utilBtn: {
-    flex: 1, backgroundColor: '#1A1A1A', borderRadius: 16, paddingVertical: 16,
+    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, paddingVertical: 16,
     alignItems: 'center', justifyContent: 'center', gap: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
   utilLabel: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
 
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#1A1A1A', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14,
-    borderWidth: 1, borderColor: '#2A2A2A',
+    backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14,
+    borderWidth: 1, borderColor: '#E5E7EB',
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#FFFFFF' },
+  searchInput: { flex: 1, fontSize: 14, color: '#111827' },
 
   partnerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: '#1A1A1A', borderRadius: 16, padding: 14,
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
   },
   partnerIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   partnerMid: { flex: 1 },
-  partnerName2: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
+  partnerName2: { fontSize: 14, fontWeight: '600', color: '#111827' },
   partnerType: { fontSize: 12, color: '#6B7280', marginTop: 2 },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },

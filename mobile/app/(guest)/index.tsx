@@ -1,8 +1,8 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Image,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, Modal,
 } from 'react-native';
-import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,7 +20,6 @@ function weatherEmoji(code: number) {
   if (code <= 82) return '🌦';
   return '⛈';
 }
-
 function useWeather() {
   const [weather, setWeather] = useState<{ temp: number; emoji: string } | null>(null);
   useEffect(() => {
@@ -33,20 +32,28 @@ function useWeather() {
 }
 
 // ─── map data ─────────────────────────────────────────────────────────────────
-const INTERLAKEN = { latitude: 46.6863, longitude: 7.8632, latitudeDelta: 0.12, longitudeDelta: 0.12 };
+const INTERLAKEN = { latitude: 46.6863, longitude: 7.8632, latitudeDelta: 0.14, longitudeDelta: 0.14 };
 
 const PARTNER_MARKERS = [
-  { id: 'partner-jungfraujoch', name: 'Jungfraujoch Railway', emoji: '🚂', lat: 46.5474, lon: 7.9854, color: '#2563EB' },
-  { id: 'partner-victoria-restaurant', name: 'Hotel Victoria', emoji: '🍽', lat: 46.6853, lon: 7.8671, color: '#DB2777' },
-  { id: 'partner-interlaken-adventure', name: 'Interlaken Adventure', emoji: '🏔', lat: 46.6856, lon: 7.8554, color: '#0D9488' },
-  { id: 'partner-bakery', name: 'Grindelwald Bäckerei', emoji: '🥐', lat: 46.6241, lon: 8.0411, color: '#D97706' },
+  { id: 'partner-jungfraujoch',        name: 'Jungfraujoch Railway',    emoji: '🚂', lat: 46.5474, lon: 7.9854, color: '#2563EB' },
+  { id: 'partner-victoria-restaurant', name: 'Hotel Victoria',          emoji: '🍽', lat: 46.6853, lon: 7.8671, color: '#DB2777' },
+  { id: 'partner-interlaken-adventure',name: 'Interlaken Adventure',    emoji: '🏔', lat: 46.6856, lon: 7.8554, color: '#0D9488' },
+  { id: 'partner-bakery',              name: 'Grindelwald Bäckerei',    emoji: '🥐', lat: 46.6241, lon: 8.0411, color: '#D97706' },
 ];
 
 const ACTIVITY_MARKERS = [
-  { id: 'paragliding', name: 'Paragliding', emoji: '🪂', lat: 46.6887, lon: 7.8490 },
-  { id: 'eiger', name: 'Eiger Trail', emoji: '⛰️', lat: 46.5781, lon: 8.0053 },
-  { id: 'glacier', name: 'Glacier Walk', emoji: '🧊', lat: 46.6241, lon: 8.0411 },
-  { id: 'boat', name: 'Lake Thun Boat', emoji: '⛵', lat: 46.7523, lon: 7.6264 },
+  { id: 'activity-paragliding',   name: 'Paragliding',     emoji: '🪂', lat: 46.6887, lon: 7.8490 },
+  { id: 'activity-eiger-trail',   name: 'Eiger Trail',     emoji: '⛰️', lat: 46.5781, lon: 8.0053 },
+  { id: 'activity-glacier-walk',  name: 'Glacier Walk',    emoji: '🧊', lat: 46.6241, lon: 8.0411 },
+  { id: 'activity-boat-tour',     name: 'Lake Thun Boat',  emoji: '⛵', lat: 46.7523, lon: 7.6264 },
+];
+
+const QUEST_LOCATIONS = [
+  { id: 'quest-harder-kulm',   name: 'Harder Kulm',        hint: 'A hidden viewpoint above Interlaken…',    reward: 40, lat: 46.6961, lon: 7.8580 },
+  { id: 'quest-beatus-caves',  name: 'St. Beatus Caves',   hint: 'Ancient lakeside caves shrouded in mist…', reward: 50, lat: 46.7123, lon: 7.7692 },
+  { id: 'quest-schynige',      name: 'Schynige Platte',    hint: 'A legendary alpine garden in the clouds…', reward: 45, lat: 46.6607, lon: 7.9334 },
+  { id: 'quest-trummelbach',   name: 'Trümmelbach Falls',  hint: 'A glacial waterfall hidden inside a cliff…',reward: 35, lat: 46.5886, lon: 7.8949 },
+  { id: 'quest-niesen',        name: 'Niesen Summit',      hint: 'The Swiss pyramid — few know its secret…', reward: 60, lat: 46.6484, lon: 7.6520 },
 ];
 
 // ─── icons ────────────────────────────────────────────────────────────────────
@@ -61,6 +68,9 @@ const BellIcon = () => (
 export default function MapScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [registeredActivities, setRegisteredActivities] = useState<Set<string>>(new Set());
+  const [discoveredQuests, setDiscoveredQuests] = useState<Set<string>>(new Set());
+  const [questModal, setQuestModal] = useState<typeof QUEST_LOCATIONS[0] | null>(null);
   const { wallet, refresh } = useWallet(userId);
   const weather = useWeather();
   const mapRef = useRef<MapView>(null);
@@ -71,6 +81,13 @@ export default function MapScreen() {
         setUserId(id);
         if (id) refresh();
       });
+      // reload registered activities + quests every time tab is focused
+      AsyncStorage.getItem('registered_activities').then(raw => {
+        if (raw) setRegisteredActivities(new Set(JSON.parse(raw)));
+      });
+      AsyncStorage.getItem('discovered_quests').then(raw => {
+        if (raw) setDiscoveredQuests(new Set(JSON.parse(raw)));
+      });
     }, [refresh])
   );
 
@@ -79,25 +96,44 @@ export default function MapScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-      mapRef.current?.animateToRegion({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-        latitudeDelta: 0.12,
-        longitudeDelta: 0.12,
-      }, 800);
+      const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      setUserLocation(coords);
+      mapRef.current?.animateToRegion({ ...coords, latitudeDelta: 0.12, longitudeDelta: 0.12 }, 800);
     })();
   }, []);
+
+  const centerOnUser = () => {
+    const target = userLocation ?? { latitude: INTERLAKEN.latitude, longitude: INTERLAKEN.longitude };
+    mapRef.current?.animateToRegion({ ...target, latitudeDelta: 0.06, longitudeDelta: 0.06 }, 600);
+  };
+
+  const handleQuestPress = (quest: typeof QUEST_LOCATIONS[0]) => {
+    if (discoveredQuests.has(quest.id)) {
+      Alert.alert(`✅ ${quest.name}`, `Already discovered! You earned ${quest.reward} pts.`);
+      return;
+    }
+    setQuestModal(quest);
+  };
+
+  const confirmDiscover = async () => {
+    if (!questModal) return;
+    const next = new Set([...discoveredQuests, questModal.id]);
+    setDiscoveredQuests(next);
+    await AsyncStorage.setItem('discovered_quests', JSON.stringify([...next]));
+    // award points
+    const raw = await AsyncStorage.getItem('wallet_data');
+    if (raw) {
+      const w = JSON.parse(raw);
+      w.pointsBalance = (w.pointsBalance ?? 0) + questModal.reward;
+      await AsyncStorage.setItem('wallet_data', JSON.stringify(w));
+    }
+    setQuestModal(null);
+    Alert.alert('🗺 Location Discovered!', `+${questModal.reward} discovery points added to your wallet.`);
+  };
 
   const name = wallet?.name ?? 'Guest';
   const balance = wallet?.tokenBalance ?? 50;
   const initial = name.charAt(0).toUpperCase();
-
-  const centerOnUser = () => {
-    if (userLocation) {
-      mapRef.current?.animateToRegion({ ...userLocation, latitudeDelta: 0.06, longitudeDelta: 0.06 }, 600);
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -115,30 +151,56 @@ export default function MapScreen() {
       >
         {/* Partner markers */}
         {PARTNER_MARKERS.map(p => (
-          <Marker
-            key={p.id}
-            coordinate={{ latitude: p.lat, longitude: p.lon }}
-            title={p.name}
-          >
-            <View style={[styles.markerBubble, { backgroundColor: p.color }]}>
-              <Text style={styles.markerEmoji}>{p.emoji}</Text>
+          <Marker key={p.id} coordinate={{ latitude: p.lat, longitude: p.lon }} title={p.name}>
+            <View>
+              <View style={[styles.markerBubble, { backgroundColor: p.color }]}>
+                <Text style={styles.markerEmoji}>{p.emoji}</Text>
+              </View>
+              <View style={[styles.markerTail, { borderTopColor: p.color }]} />
             </View>
-            <View style={[styles.markerTail, { borderTopColor: p.color }]} />
           </Marker>
         ))}
 
-        {/* Activity markers */}
-        {ACTIVITY_MARKERS.map(a => (
-          <Marker
-            key={a.id}
-            coordinate={{ latitude: a.lat, longitude: a.lon }}
-            title={a.name}
-          >
-            <View style={styles.actMarker}>
-              <Text style={{ fontSize: 18 }}>{a.emoji}</Text>
-            </View>
-          </Marker>
-        ))}
+        {/* Activity markers — green when booked */}
+        {ACTIVITY_MARKERS.map(a => {
+          const booked = registeredActivities.has(a.id);
+          return (
+            <Marker
+              key={a.id}
+              coordinate={{ latitude: a.lat, longitude: a.lon }}
+              title={a.name}
+              onPress={() => router.push('/(guest)/activities' as any)}
+            >
+              <View style={[styles.actMarker, booked && styles.actMarkerBooked]}>
+                {booked
+                  ? <Text style={styles.actMarkerCheck}>✓</Text>
+                  : <Text style={{ fontSize: 17 }}>{a.emoji}</Text>
+                }
+              </View>
+              {booked && <View style={styles.actTail} />}
+            </Marker>
+          );
+        })}
+
+        {/* Quest markers */}
+        {QUEST_LOCATIONS.map(q => {
+          const done = discoveredQuests.has(q.id);
+          return (
+            <Marker
+              key={q.id}
+              coordinate={{ latitude: q.lat, longitude: q.lon }}
+              title={done ? q.name : '???'}
+              onPress={() => handleQuestPress(q)}
+            >
+              <View>
+                <View style={[styles.questMarker, done && styles.questMarkerDone]}>
+                  <Text style={styles.questText}>{done ? '★' : '?'}</Text>
+                </View>
+                <View style={[styles.markerTail, { borderTopColor: done ? '#84CC16' : '#7C3AED' }]} />
+              </View>
+            </Marker>
+          );
+        })}
       </MapView>
 
       {/* ── Top header overlay ── */}
@@ -150,15 +212,25 @@ export default function MapScreen() {
             </View>
             <View>
               <Text style={styles.headerName}>Hi, {name}</Text>
-              {weather && (
-                <Text style={styles.headerWeather}>{weather.emoji} {weather.temp}°C · Interlaken</Text>
-              )}
+              {weather && <Text style={styles.headerWeather}>{weather.emoji} {weather.temp}°C · Interlaken</Text>}
             </View>
           </View>
-          <TouchableOpacity style={styles.bellBtn}>
-            <BellIcon />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <View style={styles.questBadge}>
+              <Text style={styles.questBadgeText}>⭐ {discoveredQuests.size}/{QUEST_LOCATIONS.length}</Text>
+            </View>
+            <TouchableOpacity style={styles.bellBtn}>
+              <BellIcon />
+            </TouchableOpacity>
+          </View>
         </View>
+      </View>
+
+      {/* ── Legend ── */}
+      <View style={styles.legend}>
+        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#14532D' }]} /><Text style={styles.legendText}>Activity</Text></View>
+        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#84CC16' }]} /><Text style={styles.legendText}>Booked</Text></View>
+        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#7C3AED' }]} /><Text style={styles.legendText}>Quest</Text></View>
       </View>
 
       {/* ── Center-on-user button ── */}
@@ -171,7 +243,6 @@ export default function MapScreen() {
 
       {/* ── Bottom wallet card ── */}
       <View style={styles.bottomCard}>
-        {/* Balance row */}
         <View style={styles.balanceRow}>
           <View>
             <Text style={styles.balanceLabel}>YOUR BALANCE</Text>
@@ -180,33 +251,42 @@ export default function MapScreen() {
               <Text style={styles.balanceCoin}>🪙 tokens</Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.payBtn}
-            onPress={() => router.push('/(guest)/scan' as any)}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity style={styles.payBtn} onPress={() => router.push('/(guest)/scan' as any)} activeOpacity={0.85}>
             <Text style={styles.payBtnText}>Pay / Scan</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Quick discover strip */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.discoverRow}>
           {ACTIVITIES.map(a => (
-            <TouchableOpacity
-              key={a.id}
-              style={styles.discoverChip}
-              onPress={() => router.push('/(guest)/activities' as any)}
-              activeOpacity={0.8}
-            >
-              {a.imageUrl && (
-                <Image source={{ uri: a.imageUrl }} style={styles.chipImg} resizeMode="cover" />
-              )}
+            <TouchableOpacity key={a.id} style={styles.discoverChip} onPress={() => router.push('/(guest)/activities' as any)} activeOpacity={0.8}>
+              {a.imageUrl && <Image source={{ uri: a.imageUrl }} style={styles.chipImg} resizeMode="cover" />}
               <View style={styles.chipOverlay} />
+              {registeredActivities.has(a.id) && <View style={styles.chipBooked}><Text style={styles.chipBookedText}>✓</Text></View>}
               <Text style={styles.chipText} numberOfLines={1}>{a.title}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
+
+      {/* ── Quest discovery modal ── */}
+      <Modal visible={!!questModal} transparent animationType="slide" onRequestClose={() => setQuestModal(null)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setQuestModal(null)} />
+        <View style={styles.questModal}>
+          <View style={styles.questModalIcon}>
+            <Text style={styles.questModalQ}>?</Text>
+          </View>
+          <Text style={styles.questModalTitle}>Unknown Location</Text>
+          <Text style={styles.questModalHint}>{questModal?.hint}</Text>
+          <View style={styles.questModalReward}>
+            <Text style={styles.questModalRewardText}>+{questModal?.reward} discovery points</Text>
+          </View>
+          <TouchableOpacity style={styles.discoverBtn} onPress={confirmDiscover} activeOpacity={0.85}>
+            <Text style={styles.discoverBtnText}>🗺 Discover this place</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setQuestModal(null)}>
+            <Text style={styles.cancelText}>Not now</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
     </View>
   );
@@ -216,7 +296,7 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // markers
+  // partner markers
   markerBubble: {
     width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: '#FFFFFF',
@@ -228,12 +308,31 @@ const styles = StyleSheet.create({
     borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 7,
     borderLeftColor: 'transparent', borderRightColor: 'transparent',
   },
+
+  // activity markers
   actMarker: {
-    backgroundColor: '#FFFFFF', borderRadius: 999, width: 34, height: 34,
+    backgroundColor: '#FFFFFF', borderRadius: 999, width: 36, height: 36,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#E5E7EB',
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3,
+    borderWidth: 2, borderColor: '#D1D5DB',
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3,
   },
+  actMarkerBooked: { backgroundColor: '#14532D', borderColor: '#84CC16', borderWidth: 2.5 },
+  actMarkerCheck: { fontSize: 16, fontWeight: '900', color: '#84CC16' },
+  actTail: {
+    width: 0, height: 0, alignSelf: 'center',
+    borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 7,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#14532D',
+  },
+
+  // quest markers
+  questMarker: {
+    width: 36, height: 36, borderRadius: 999, backgroundColor: '#7C3AED',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.8)',
+    shadowColor: '#7C3AED', shadowOpacity: 0.5, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 5,
+  },
+  questMarkerDone: { backgroundColor: '#14532D' },
+  questText: { fontSize: 18, fontWeight: '900', color: '#FFFFFF' },
 
   // top overlay
   topOverlay: {
@@ -242,28 +341,35 @@ const styles = StyleSheet.create({
   },
   headerCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.96)', borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 11,
     shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarCircle: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: '#0F766E',
-    alignItems: 'center', justifyContent: 'center',
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  avatarCircle: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#0F766E', alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
+  headerName: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  headerWeather: { fontSize: 11, color: '#6B7280', marginTop: 1 },
+  questBadge: { backgroundColor: '#F3F0FF', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  questBadgeText: { fontSize: 11, fontWeight: '700', color: '#7C3AED' },
+  bellBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+
+  // legend
+  legend: {
+    position: 'absolute', top: 135, right: 16,
+    backgroundColor: 'rgba(255,255,255,0.93)', borderRadius: 14,
+    paddingHorizontal: 12, paddingVertical: 10, gap: 6,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
-  avatarInitial: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
-  headerName: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  headerWeather: { fontSize: 12, color: '#6B7280', marginTop: 1 },
-  bellBtn: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6',
-    alignItems: 'center', justifyContent: 'center',
-  },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { fontSize: 11, color: '#374151', fontWeight: '500' },
 
   // locate button
   locBtn: {
-    position: 'absolute', right: 16, bottom: 260,
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    position: 'absolute', right: 16, bottom: 255,
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
   },
@@ -272,33 +378,50 @@ const styles = StyleSheet.create({
   bottomCard: {
     position: 'absolute', bottom: 100, left: 16, right: 16,
     backgroundColor: '#FFFFFF', borderRadius: 24,
-    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 14,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
     shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 10,
-    gap: 14,
+    gap: 12,
   },
   balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   balanceLabel: { fontSize: 10, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1.5 },
   balanceAmt: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
-  balanceNum: { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -1 },
-  balanceCoin: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
-  payBtn: {
-    backgroundColor: '#14532D', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 12,
-  },
-  payBtnText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
-
-  // discover strip
+  balanceNum: { fontSize: 28, fontWeight: '800', color: '#111827', letterSpacing: -1 },
+  balanceCoin: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  payBtn: { backgroundColor: '#14532D', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 11 },
+  payBtnText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
   discoverRow: { gap: 10, paddingRight: 4 },
-  discoverChip: {
-    width: 130, height: 70, borderRadius: 14, overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
-  },
+  discoverChip: { width: 120, height: 66, borderRadius: 14, overflow: 'hidden', backgroundColor: '#F3F4F6' },
   chipImg: { width: '100%', height: '100%', position: 'absolute' },
-  chipOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.38)',
+  chipOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.38)' },
+  chipBooked: {
+    position: 'absolute', top: 6, right: 6,
+    backgroundColor: '#84CC16', borderRadius: 999, width: 18, height: 18,
+    alignItems: 'center', justifyContent: 'center',
   },
-  chipText: {
-    position: 'absolute', bottom: 8, left: 8, right: 8,
-    fontSize: 11, fontWeight: '700', color: '#FFFFFF',
+  chipBookedText: { fontSize: 10, fontWeight: '900', color: '#111827' },
+  chipText: { position: 'absolute', bottom: 7, left: 8, right: 8, fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
+
+  // quest modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  questModal: {
+    backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 24, paddingTop: 28, paddingBottom: 44, alignItems: 'center', gap: 12,
   },
+  questModalIcon: {
+    width: 72, height: 72, borderRadius: 36, backgroundColor: '#7C3AED',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+  },
+  questModalQ: { fontSize: 36, fontWeight: '900', color: '#FFFFFF' },
+  questModalTitle: { fontSize: 22, fontWeight: '800', color: '#111827' },
+  questModalHint: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 21, maxWidth: 300 },
+  questModalReward: {
+    backgroundColor: '#F3F0FF', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8,
+  },
+  questModalRewardText: { fontSize: 13, fontWeight: '700', color: '#7C3AED' },
+  discoverBtn: {
+    width: '100%', backgroundColor: '#14532D', borderRadius: 16,
+    paddingVertical: 16, alignItems: 'center', marginTop: 4,
+  },
+  discoverBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
+  cancelText: { fontSize: 13, color: '#9CA3AF', paddingVertical: 4 },
 });

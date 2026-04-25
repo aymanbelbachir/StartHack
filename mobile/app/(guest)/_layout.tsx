@@ -74,6 +74,14 @@ export default function GuestLayout() {
         headerTintColor: '#111827',
         tabBarActiveTintColor: '#84CC16',
         tabBarInactiveTintColor: '#9CA3AF',
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingBottom: 0,
+          paddingTop: 0,
+          marginBottom: 0,
+          marginTop: 0,
+        },
       }}
     >
       <Tabs.Screen
