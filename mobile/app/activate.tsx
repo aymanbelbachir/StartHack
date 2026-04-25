@@ -63,12 +63,12 @@ async function saveActivation(data: {
   const userId = await AsyncStorage.getItem('userId');
 
   if (FIREBASE_CONFIGURED && db) {
-    const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+    const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
     if (userId) {
-      await updateDoc(doc(db, 'users', userId), {
+      await setDoc(doc(db, 'users', userId), {
         ...data,
         activatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
     }
   }
 
