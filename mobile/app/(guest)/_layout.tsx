@@ -108,6 +108,10 @@ export default function GuestLayout() {
         name="profile"
         options={{ href: null, headerShown: false }}
       />
+      <Tabs.Screen
+        name="topup"
+        options={{ href: null, headerShown: false }}
+      />
     </Tabs>
   );
 }

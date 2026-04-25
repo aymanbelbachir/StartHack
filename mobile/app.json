@@ -50,7 +50,8 @@
           "locationAlwaysAndWhenInUsePermission": "Allow JungfrauPass to use your location."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

@@ -220,6 +220,16 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* ── Wallet ── */}
+        <Section title="Wallet" />
+        <View style={styles.card}>
+          <Row
+            label="Buy Tokens"
+            value={`${wallet?.tokenBalance ?? 0} 🪙 current balance`}
+            onPress={() => router.push('/(guest)/topup' as any)}
+          />
+        </View>
+
         {/* ── Account ── */}
         <Section title="Account" />
         <View style={styles.card}>
