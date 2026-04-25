@@ -11,7 +11,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
-import { parseInvoice, type ParsedInvoice } from '@/lib/parseInvoice';
+import { parseInvoice, parseInvoiceDate, type ParsedInvoice } from '@/lib/parseInvoice';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://localhost:3000';
 
@@ -166,13 +166,21 @@ export default function ActivateScreen() {
     if (!parsed) return;
     setConfirming(true);
     try {
+      // Convert "Sunday, 20 April 2026" → "2026-04-20" for stayStatus compatibility
+      const toISO = (str: string) => {
+        const d = parseInvoiceDate(str);
+        if (!d) return str;
+        return d.toISOString().split('T')[0];
+      };
+
       await saveActivation({
         name: parsed.guest || undefined,
         hotelCode: parsed.refNumber || undefined,
         tokenBalance: parsed.nights * 10,
-        checkIn: parsed.checkIn,
-        checkOut: parsed.checkOut,
+        checkIn: toISO(parsed.checkIn),
+        checkOut: toISO(parsed.checkOut),
         hotel: parsed.hotel || undefined,
+        nights: parsed.nights,
         activationType: 'invoice',
       });
       router.replace('/(guest)');
@@ -216,13 +224,12 @@ export default function ActivateScreen() {
       const expiry = new Date();
       expiry.setDate(today.getDate() + days);
 
-      const fmt = (d: Date) =>
-        d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const toISO = (d: Date) => d.toISOString().split('T')[0];
 
       await saveActivation({
         tokenBalance: 0,
-        checkIn: fmt(today),
-        checkOut: fmt(expiry),
+        checkIn: toISO(today),
+        checkOut: toISO(expiry),
         activationType: 'daypass',
       });
 

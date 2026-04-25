@@ -230,6 +230,32 @@ export default function ProfileScreen() {
           />
         </View>
 
+        {/* ── Stay ── */}
+        {wallet?.checkIn && (
+          <>
+            <Section title="My Stay" />
+            <View style={styles.card}>
+              {wallet?.hotel && (
+                <>
+                  <Row label="Hotel" value={wallet.hotel} />
+                  <View style={styles.divider} />
+                </>
+              )}
+              <Row label="Ref." value={wallet?.hotelCode} />
+              <View style={styles.divider} />
+              <Row label="Check-in" value={wallet?.checkIn} />
+              <View style={styles.divider} />
+              <Row label="Check-out" value={wallet?.checkOut} />
+              {wallet?.nights && (
+                <>
+                  <View style={styles.divider} />
+                  <Row label="Duration" value={`${wallet.nights} night${wallet.nights > 1 ? 's' : ''}`} />
+                </>
+              )}
+            </View>
+          </>
+        )}
+
         {/* ── Account ── */}
         <Section title="Account" />
         <View style={styles.card}>
@@ -238,8 +264,6 @@ export default function ProfileScreen() {
           <Row label="Email" value={email} onPress={() => setEditModal('email')} />
           <View style={styles.divider} />
           <Row label="Change Password" onPress={() => setEditModal('password')} />
-          <View style={styles.divider} />
-          <Row label="Hotel Code" value={wallet?.hotelCode} />
         </View>
 
         {/* ── Preferences ── */}
