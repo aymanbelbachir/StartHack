@@ -49,11 +49,11 @@ const ACTIVITY_MARKERS = [
 ];
 
 const QUEST_LOCATIONS = [
-  { id: 'quest-harder-kulm',   name: 'Harder Kulm',        hint: 'A hidden viewpoint above Interlaken…',    reward: 40, lat: 46.6961, lon: 7.8580 },
-  { id: 'quest-beatus-caves',  name: 'St. Beatus Caves',   hint: 'Ancient lakeside caves shrouded in mist…', reward: 50, lat: 46.7123, lon: 7.7692 },
-  { id: 'quest-schynige',      name: 'Schynige Platte',    hint: 'A legendary alpine garden in the clouds…', reward: 45, lat: 46.6607, lon: 7.9334 },
-  { id: 'quest-trummelbach',   name: 'Trümmelbach Falls',  hint: 'A glacial waterfall hidden inside a cliff…',reward: 35, lat: 46.5886, lon: 7.8949 },
-  { id: 'quest-niesen',        name: 'Niesen Summit',      hint: 'The Swiss pyramid — few know its secret…', reward: 60, lat: 46.6484, lon: 7.6520 },
+  { id: 'quest-paragliding-launch', name: 'Beatenberg Launch Site', hint: 'Paragliders take off from this ridge high above Interlaken. Find the ramp where brave souls leap into the Alps…', reward: 40, lat: 46.6887, lon: 7.8490 },
+  { id: 'quest-eiger-north',        name: 'Eiger North Face',       hint: 'The most feared wall in alpine climbing. Stand at the base of this 1800m north face and feel its shadow…',     reward: 50, lat: 46.5781, lon: 8.0053 },
+  { id: 'quest-grindelwald-glacier',name: 'Grindelwald Glacier',    hint: 'An ancient river of ice retreating year by year. Witness the glacier before it vanishes into history…',         reward: 45, lat: 46.6241, lon: 8.0411 },
+  { id: 'quest-thun-castle',        name: 'Oberhofen Castle',       hint: 'A fairy-tale castle rising straight from the turquoise waters of Lake Thun. Spot it from the boat tour…',       reward: 35, lat: 46.7523, lon: 7.6264 },
+  { id: 'quest-jungfraujoch',       name: 'Top of Europe',          hint: 'At 3,454m, the Jungfraujoch station is the highest railway station in Europe. The view of the Aletsch glacier is unforgettable…', reward: 60, lat: 46.5474, lon: 7.9854 },
 ];
 
 // ─── icons ────────────────────────────────────────────────────────────────────
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
 
   // locate button
   locBtn: {
-    position: 'absolute', right: 16, bottom: 255,
+    position: 'absolute', right: 16, bottom: 220,
     width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
@@ -376,11 +376,11 @@ const styles = StyleSheet.create({
 
   // bottom card
   bottomCard: {
-    position: 'absolute', bottom: 100, left: 16, right: 16,
+    position: 'absolute', bottom: 98, left: 16, right: 16,
     backgroundColor: '#FFFFFF', borderRadius: 24,
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
     shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 10,
-    gap: 12,
+    gap: 8,
   },
   balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   balanceLabel: { fontSize: 10, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1.5 },
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   payBtn: { backgroundColor: '#14532D', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 11 },
   payBtnText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
   discoverRow: { gap: 10, paddingRight: 4 },
-  discoverChip: { width: 120, height: 66, borderRadius: 14, overflow: 'hidden', backgroundColor: '#F3F4F6' },
+  discoverChip: { width: 110, height: 58, borderRadius: 14, overflow: 'hidden', backgroundColor: '#F3F4F6' },
   chipImg: { width: '100%', height: '100%', position: 'absolute' },
   chipOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.38)' },
   chipBooked: {
