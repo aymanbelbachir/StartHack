@@ -66,7 +66,7 @@ export default function AuthScreen() {
           query(collection(db, 'partners'), where('email', '==', normalizedEmail), limit(1))
         );
         if (!partnerSnap.empty) {
-          const { localId } = await authRequest('signUp', {
+          await authRequest('signUp', {
             email: normalizedEmail, password, returnSecureToken: true,
           });
           const partnerDoc = partnerSnap.docs[0];
@@ -122,7 +122,8 @@ export default function AuthScreen() {
         await saveUserSnapshot();
       }
 
-      router.replace('/(guest)');
+      // New users always go to activate first
+      router.replace('/activate' as any);
     } catch (e: any) {
       Alert.alert('Error', e.message ?? 'Sign up failed');
     } finally {
@@ -173,7 +174,9 @@ export default function AuthScreen() {
           ['role', 'guest'],
           ['wallet_data', JSON.stringify(walletData)],
         ]);
-        router.replace('/(guest)');
+        // Route to activate if never activated (no checkIn stored)
+        const activated = !!(walletData as any).checkIn;
+        router.replace(activated ? '/(guest)' : '/activate' as any);
       } else {
         // Offline fallback
         const snapshot = await findLocalUserByEmail(email.trim().toLowerCase());

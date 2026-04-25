@@ -15,13 +15,20 @@ const TOKEN_PACKS = {
   100: { amount: 899,  label: '100 JungfrauPass Tokens' },
 };
 
+const DAY_PACKS = {
+  1: { amount: 2000,  label: '1-Day JungfrauPass' },
+  3: { amount: 5000,  label: '3-Day JungfrauPass' },
+  7: { amount: 10000, label: '7-Day JungfrauPass' },
+};
+
 // Create a Stripe Checkout Session and return its URL
 app.post('/create-checkout-session', async (req, res) => {
   try {
-    const { tokens } = req.body;
+    const { tokens, redirectUrl } = req.body;
     const pack = TOKEN_PACKS[tokens];
     if (!pack) return res.status(400).json({ error: 'Invalid token pack' });
 
+    const base = redirectUrl || 'jungfraupass://topup';
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
@@ -33,8 +40,8 @@ app.post('/create-checkout-session', async (req, res) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `jungfraupass://topup?status=success&tokens=${tokens}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: 'jungfraupass://topup?status=cancel',
+      success_url: `${base}?status=success&tokens=${tokens}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:  `${base}?status=cancel`,
     });
 
     res.json({ url: session.url });
@@ -44,7 +51,37 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 });
 
-// Verify a completed session before crediting tokens
+// Create a Stripe Checkout Session for a day pass
+app.post('/create-daypass-session', async (req, res) => {
+  try {
+    const { days, redirectUrl } = req.body;
+    const pack = DAY_PACKS[days];
+    if (!pack) return res.status(400).json({ error: 'Invalid day pack' });
+
+    const base = redirectUrl || 'jungfraupass://daypass';
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'chf',
+          product_data: { name: pack.label },
+          unit_amount: pack.amount,
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: `${base}?status=success&days=${days}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:  `${base}?status=cancel`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Verify a completed session before crediting tokens/days
 app.get('/verify-session', async (req, res) => {
   try {
     const session = await stripe.checkout.sessions.retrieve(req.query.session_id);

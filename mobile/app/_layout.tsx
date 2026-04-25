@@ -7,6 +7,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="activate" />
         <Stack.Screen name="(guest)" />
         <Stack.Screen name="(partner)" />
       </Stack>
