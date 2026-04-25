@@ -58,7 +58,7 @@ export default function GuestLayout() {
           left: 20,
           right: 20,
           borderRadius: 999,
-          backgroundColor: '#111827',
+          backgroundColor: '#0D2818',
           borderTopWidth: 0,
           height: 70,
           paddingBottom: 0,

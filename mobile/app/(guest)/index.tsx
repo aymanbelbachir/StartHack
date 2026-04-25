@@ -1,16 +1,17 @@
-import React, { useCallback, useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Image,
+} from 'react-native';
+import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { WalletCard } from '@/components/WalletCard';
 import { useWallet } from '@/hooks/useWallet';
-import { useTransactions } from '@/hooks/useTransactions';
-import { TransactionItem } from '@/components/TransactionItem';
 import { ACTIVITIES } from '@/data/activities';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 
 // ─── weather ─────────────────────────────────────────────────────────────────
-function weatherEmoji(code: number): string {
+function weatherEmoji(code: number) {
   if (code === 0) return '☀️';
   if (code <= 3) return '🌤';
   if (code <= 48) return '🌫';
@@ -23,37 +24,46 @@ function weatherEmoji(code: number): string {
 function useWeather() {
   const [weather, setWeather] = useState<{ temp: number; emoji: string } | null>(null);
   useEffect(() => {
-    fetch(
-      'https://api.open-meteo.com/v1/forecast?latitude=46.6863&longitude=7.8632&current=temperature_2m,weathercode&timezone=Europe%2FZurich'
-    )
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=46.6863&longitude=7.8632&current=temperature_2m,weathercode&timezone=Europe%2FZurich')
       .then(r => r.json())
-      .then(d => {
-        const temp = Math.round(d.current.temperature_2m);
-        const emoji = weatherEmoji(d.current.weathercode);
-        setWeather({ temp, emoji });
-      })
+      .then(d => setWeather({ temp: Math.round(d.current.temperature_2m), emoji: weatherEmoji(d.current.weathercode) }))
       .catch(() => {});
   }, []);
   return weather;
 }
 
+// ─── map data ─────────────────────────────────────────────────────────────────
+const INTERLAKEN = { latitude: 46.6863, longitude: 7.8632, latitudeDelta: 0.12, longitudeDelta: 0.12 };
+
+const PARTNER_MARKERS = [
+  { id: 'partner-jungfraujoch', name: 'Jungfraujoch Railway', emoji: '🚂', lat: 46.5474, lon: 7.9854, color: '#2563EB' },
+  { id: 'partner-victoria-restaurant', name: 'Hotel Victoria', emoji: '🍽', lat: 46.6853, lon: 7.8671, color: '#DB2777' },
+  { id: 'partner-interlaken-adventure', name: 'Interlaken Adventure', emoji: '🏔', lat: 46.6856, lon: 7.8554, color: '#0D9488' },
+  { id: 'partner-bakery', name: 'Grindelwald Bäckerei', emoji: '🥐', lat: 46.6241, lon: 8.0411, color: '#D97706' },
+];
+
+const ACTIVITY_MARKERS = [
+  { id: 'paragliding', name: 'Paragliding', emoji: '🪂', lat: 46.6887, lon: 7.8490 },
+  { id: 'eiger', name: 'Eiger Trail', emoji: '⛰️', lat: 46.5781, lon: 8.0053 },
+  { id: 'glacier', name: 'Glacier Walk', emoji: '🧊', lat: 46.6241, lon: 8.0411 },
+  { id: 'boat', name: 'Lake Thun Boat', emoji: '⛵', lat: 46.7523, lon: 7.6264 },
+];
+
 // ─── icons ────────────────────────────────────────────────────────────────────
 const BellIcon = () => (
-  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-    <Path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="#111827" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="#111827" strokeWidth="2" strokeLinecap="round" />
     <Path d="M13.73 21a2 2 0 01-3.46 0" stroke="#111827" strokeWidth="2" strokeLinecap="round" />
   </Svg>
 );
 
-const PILLS = ['🏔 Tokens', '🎟 Benefits', '⭐ Points', '🗺 Map'];
-
 // ─── screen ───────────────────────────────────────────────────────────────────
-export default function WalletScreen() {
+export default function MapScreen() {
   const [userId, setUserId] = useState<string | null>(null);
-  const [activeP, setActiveP] = useState(0);
-  const { wallet, loading, refresh } = useWallet(userId);
-  const { transactions } = useTransactions(userId);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const { wallet, refresh } = useWallet(userId);
   const weather = useWeather();
+  const mapRef = useRef<MapView>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -64,220 +74,231 @@ export default function WalletScreen() {
     }, [refresh])
   );
 
-  if (loading) {
-    return <View style={styles.loading}><Text style={styles.loadingText}>Loading...</Text></View>;
-  }
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      mapRef.current?.animateToRegion({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        latitudeDelta: 0.12,
+        longitudeDelta: 0.12,
+      }, 800);
+    })();
+  }, []);
 
   const name = wallet?.name ?? 'Guest';
-  const initial = name.charAt(0).toUpperCase();
   const balance = wallet?.tokenBalance ?? 50;
+  const initial = name.charAt(0).toUpperCase();
+
+  const centerOnUser = () => {
+    if (userLocation) {
+      mapRef.current?.animateToRegion({ ...userLocation, latitudeDelta: 0.06, longitudeDelta: 0.06 }, 600);
+    }
+  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
 
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>Hi, {name}</Text>
-          {weather && (
-            <View style={styles.weatherPill}>
-              <Text style={styles.weatherEmoji}>{weather.emoji}</Text>
-              <Text style={styles.weatherTemp}>{weather.temp}°C</Text>
-              <Text style={styles.weatherPlace}> · Interlaken</Text>
+      {/* ── Full-screen map ── */}
+      <MapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFillObject}
+        provider={PROVIDER_DEFAULT}
+        initialRegion={INTERLAKEN}
+        showsUserLocation
+        showsMyLocationButton={false}
+        showsCompass={false}
+        showsScale={false}
+      >
+        {/* Partner markers */}
+        {PARTNER_MARKERS.map(p => (
+          <Marker
+            key={p.id}
+            coordinate={{ latitude: p.lat, longitude: p.lon }}
+            title={p.name}
+          >
+            <View style={[styles.markerBubble, { backgroundColor: p.color }]}>
+              <Text style={styles.markerEmoji}>{p.emoji}</Text>
             </View>
-          )}
-        </View>
-        <TouchableOpacity style={styles.bellBtn}>
-          <BellIcon />
-        </TouchableOpacity>
-      </View>
+            <View style={[styles.markerTail, { borderTopColor: p.color }]} />
+          </Marker>
+        ))}
 
-      {/* ── Title block ── */}
-      <View style={styles.titleBlock}>
-        <View style={styles.titleRow}>
-          <View style={styles.titleLeft}>
-            <Text style={styles.locationLabel}>JUNGFRAU REGION</Text>
-            <Text style={styles.bigTitle}>Your{'\n'}Wallet</Text>
-          </View>
-          <View style={styles.avatarBadge}>
+        {/* Activity markers */}
+        {ACTIVITY_MARKERS.map(a => (
+          <Marker
+            key={a.id}
+            coordinate={{ latitude: a.lat, longitude: a.lon }}
+            title={a.name}
+          >
+            <View style={styles.actMarker}>
+              <Text style={{ fontSize: 18 }}>{a.emoji}</Text>
+            </View>
+          </Marker>
+        ))}
+      </MapView>
+
+      {/* ── Top header overlay ── */}
+      <View style={styles.topOverlay}>
+        <View style={styles.headerCard}>
+          <View style={styles.headerLeft}>
             <View style={styles.avatarCircle}>
               <Text style={styles.avatarInitial}>{initial}</Text>
             </View>
-            <View style={styles.balanceBlock}>
-              <Text style={styles.balanceAmount}>{balance}</Text>
-              <Text style={styles.balanceCoin}>🪙</Text>
+            <View>
+              <Text style={styles.headerName}>Hi, {name}</Text>
+              {weather && (
+                <Text style={styles.headerWeather}>{weather.emoji} {weather.temp}°C · Interlaken</Text>
+              )}
             </View>
-            <Text style={styles.balanceLabel}>tokens</Text>
           </View>
+          <TouchableOpacity style={styles.bellBtn}>
+            <BellIcon />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── Category pills ── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillsRow}>
-        {PILLS.map((pill, i) => (
+      {/* ── Center-on-user button ── */}
+      <TouchableOpacity style={styles.locBtn} onPress={centerOnUser} activeOpacity={0.85}>
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+          <Circle cx="12" cy="12" r="4" stroke="#14532D" strokeWidth="2" />
+          <Path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#14532D" strokeWidth="2" strokeLinecap="round" />
+        </Svg>
+      </TouchableOpacity>
+
+      {/* ── Bottom wallet card ── */}
+      <View style={styles.bottomCard}>
+        {/* Balance row */}
+        <View style={styles.balanceRow}>
+          <View>
+            <Text style={styles.balanceLabel}>YOUR BALANCE</Text>
+            <View style={styles.balanceAmt}>
+              <Text style={styles.balanceNum}>{balance}</Text>
+              <Text style={styles.balanceCoin}>🪙 tokens</Text>
+            </View>
+          </View>
           <TouchableOpacity
-            key={pill}
-            style={[styles.pill, activeP === i && styles.pillActive]}
-            onPress={() => setActiveP(i)}
-            activeOpacity={0.8}
+            style={styles.payBtn}
+            onPress={() => router.push('/(guest)/scan' as any)}
+            activeOpacity={0.85}
           >
-            <Text style={[styles.pillText, activeP === i && styles.pillTextActive]}>{pill}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* ── Wallet cards ── */}
-      <WalletCard
-        tokenBalance={balance}
-        pointsBalance={wallet?.pointsBalance ?? 0}
-        name={name}
-        location={wallet?.checkInLocation ?? 'Jungfrau Region'}
-      />
-
-      {/* ── Discover ── */}
-      <View style={styles.discoverSection}>
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Discover</Text>
-          <TouchableOpacity onPress={() => router.push('/(guest)/activities' as any)}>
-            <Text style={styles.seeAll}>See all</Text>
+            <Text style={styles.payBtnText}>Pay / Scan</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.discoverRow}
-        >
-          {ACTIVITIES.map((activity) => (
+
+        {/* Quick discover strip */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.discoverRow}>
+          {ACTIVITIES.map(a => (
             <TouchableOpacity
-              key={activity.id}
-              style={styles.discoverCard}
+              key={a.id}
+              style={styles.discoverChip}
               onPress={() => router.push('/(guest)/activities' as any)}
-              activeOpacity={0.88}
+              activeOpacity={0.8}
             >
-              {activity.imageUrl ? (
-                <Image source={{ uri: activity.imageUrl }} style={styles.discoverImg} resizeMode="cover" />
-              ) : (
-                <View style={[styles.discoverImg, { backgroundColor: '#14532D', alignItems: 'center', justifyContent: 'center' }]}>
-                  <Text style={{ fontSize: 36 }}>{activity.imageEmoji}</Text>
-                </View>
+              {a.imageUrl && (
+                <Image source={{ uri: a.imageUrl }} style={styles.chipImg} resizeMode="cover" />
               )}
-              <View style={styles.discoverInfo}>
-                <Text style={styles.discoverCategory}>{activity.category}</Text>
-                <Text style={styles.discoverTitle} numberOfLines={2}>{activity.title}</Text>
-                <Text style={styles.discoverLocation}>📍 {activity.location}</Text>
-              </View>
+              <View style={styles.chipOverlay} />
+              <Text style={styles.chipText} numberOfLines={1}>{a.title}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      {/* ── Recent transactions ── */}
-      <View style={styles.recentSection}>
-        <Text style={styles.sectionTitle}>Recent</Text>
-        {transactions.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>💳</Text>
-            <Text style={styles.emptyTitle}>No transactions yet</Text>
-            <Text style={styles.emptySub}>Scan a partner QR to get started</Text>
-          </View>
-        ) : (
-          <>
-            {transactions.slice(0, 4).map((tx) => <TransactionItem key={tx.id} transaction={tx} />)}
-            {transactions.length > 4 && (
-              <TouchableOpacity onPress={() => router.push('/(guest)/history' as any)}>
-                <Text style={styles.viewAll}>View all transactions</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
 // ─── styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  content: { paddingBottom: 130 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F9FAFB' },
-  loadingText: { color: '#9CA3AF', fontSize: 14 },
+  container: { flex: 1 },
 
-  // header
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-    paddingHorizontal: 24, paddingTop: 60, paddingBottom: 4,
+  // markers
+  markerBubble: {
+    width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#FFFFFF',
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4,
   },
-  headerLeft: { gap: 6 },
-  greeting: { fontSize: 26, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
-  weatherPill: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F3F4F6', borderRadius: 999,
-    paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start',
+  markerEmoji: { fontSize: 18 },
+  markerTail: {
+    width: 0, height: 0, alignSelf: 'center',
+    borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 7,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent',
   },
-  weatherEmoji: { fontSize: 14 },
-  weatherTemp: { fontSize: 13, fontWeight: '700', color: '#111827', marginLeft: 5 },
-  weatherPlace: { fontSize: 12, color: '#9CA3AF' },
-  bellBtn: {
-    width: 40, height: 40, borderRadius: 999, backgroundColor: '#F3F4F6',
-    alignItems: 'center', justifyContent: 'center', marginTop: 4,
+  actMarker: {
+    backgroundColor: '#FFFFFF', borderRadius: 999, width: 34, height: 34,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: '#E5E7EB',
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3,
   },
 
-  // title block
-  titleBlock: { paddingHorizontal: 24, marginTop: 12, marginBottom: 20 },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  titleLeft: { gap: 4 },
-  locationLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 3, textTransform: 'uppercase' },
-  bigTitle: { fontSize: 40, fontWeight: '800', color: '#111827', lineHeight: 46, letterSpacing: -1 },
-
-  avatarBadge: { alignItems: 'center', gap: 6, paddingBottom: 2 },
+  // top overlay
+  topOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    paddingTop: 56, paddingHorizontal: 16, paddingBottom: 8,
+  },
+  headerCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 12,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6,
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarCircle: {
-    width: 54, height: 54, borderRadius: 27,
-    backgroundColor: '#0F766E', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: '#FFFFFF',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3,
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#0F766E',
+    alignItems: 'center', justifyContent: 'center',
   },
-  avatarInitial: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  balanceBlock: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: '#111827', borderRadius: 999,
-    paddingHorizontal: 12, paddingVertical: 6,
+  avatarInitial: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
+  headerName: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  headerWeather: { fontSize: 12, color: '#6B7280', marginTop: 1 },
+  bellBtn: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6',
+    alignItems: 'center', justifyContent: 'center',
   },
-  balanceAmount: { fontSize: 20, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
-  balanceCoin: { fontSize: 16 },
-  balanceLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
 
-  // pills
-  pillsRow: { paddingHorizontal: 24, gap: 10, marginBottom: 20 },
-  pill: { backgroundColor: '#F3F4F6', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
-  pillActive: { backgroundColor: '#111827' },
-  pillText: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  pillTextActive: { color: '#FFFFFF' },
-
-  // discover
-  discoverSection: { paddingHorizontal: 24, marginTop: 24 },
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  seeAll: { fontSize: 13, color: '#84CC16', fontWeight: '600' },
-  discoverRow: { gap: 12, paddingRight: 24 },
-  discoverCard: {
-    width: 175, height: 220, borderRadius: 20, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 4,
+  // locate button
+  locBtn: {
+    position: 'absolute', right: 16, bottom: 260,
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
   },
-  discoverImg: { width: '100%', height: '100%', position: 'absolute' },
-  discoverInfo: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 14, backgroundColor: 'rgba(0,0,0,0.5)',
-    borderBottomLeftRadius: 20, borderBottomRightRadius: 20, gap: 2,
-  },
-  discoverCategory: { fontSize: 10, fontWeight: '700', color: '#84CC16', letterSpacing: 1, textTransform: 'uppercase' },
-  discoverTitle: { fontSize: 14, fontWeight: '700', color: '#FFFFFF', lineHeight: 18 },
-  discoverLocation: { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
 
-  // recent
-  recentSection: { paddingHorizontal: 24, marginTop: 28 },
-  empty: { paddingVertical: 32, alignItems: 'center', gap: 6 },
-  emptyIcon: { fontSize: 32, marginBottom: 4 },
-  emptyTitle: { fontSize: 15, fontWeight: '600', color: '#374151' },
-  emptySub: { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
-  viewAll: { color: '#84CC16', fontSize: 13, fontWeight: '700', textAlign: 'center', paddingVertical: 8 },
+  // bottom card
+  bottomCard: {
+    position: 'absolute', bottom: 100, left: 16, right: 16,
+    backgroundColor: '#FFFFFF', borderRadius: 24,
+    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 14,
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 10,
+    gap: 14,
+  },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  balanceLabel: { fontSize: 10, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1.5 },
+  balanceAmt: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
+  balanceNum: { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -1 },
+  balanceCoin: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+  payBtn: {
+    backgroundColor: '#14532D', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 12,
+  },
+  payBtnText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
+
+  // discover strip
+  discoverRow: { gap: 10, paddingRight: 4 },
+  discoverChip: {
+    width: 130, height: 70, borderRadius: 14, overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+  },
+  chipImg: { width: '100%', height: '100%', position: 'absolute' },
+  chipOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.38)',
+  },
+  chipText: {
+    position: 'absolute', bottom: 8, left: 8, right: 8,
+    fontSize: 11, fontWeight: '700', color: '#FFFFFF',
+  },
 });
