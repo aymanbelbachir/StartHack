@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platfor
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from '@/components/Button';
+import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 
 const PARTNER_CREDENTIALS: Record<string, string> = {
   'partner-jungfraujoch': 'Jungfraujoch Railway',
@@ -11,18 +12,38 @@ const PARTNER_CREDENTIALS: Record<string, string> = {
   'partner-bakery': 'Grindelwald Bäckerei',
 };
 
+const PARTNER_TYPES: Record<string, string> = {
+  'partner-jungfraujoch': 'Transport',
+  'partner-victoria-restaurant': 'Restaurant',
+  'partner-interlaken-adventure': 'Activity',
+  'partner-bakery': 'Food & Drink',
+};
+
 export default function RoleScreen() {
   const [partnerId, setPartnerId] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handlePartnerLogin = async () => {
-    const name = PARTNER_CREDENTIALS[partnerId.toLowerCase()];
+    const pid = partnerId.trim().toLowerCase();
+    const name = PARTNER_CREDENTIALS[pid];
     if (!name) { Alert.alert('Invalid ID', 'Partner ID not found'); return; }
     setLoading(true);
-    await AsyncStorage.setItem('partnerId', partnerId.toLowerCase());
-    await AsyncStorage.setItem('partnerName', name);
-    await AsyncStorage.setItem('role', 'partner');
-    router.replace('/(partner)');
+    try {
+      // Register / update partner doc in Firestore so guest list is live
+      if (FIREBASE_CONFIGURED && db) {
+        const { doc, setDoc } = await import('firebase/firestore');
+        await setDoc(doc(db, 'partners', pid), {
+          name,
+          type: PARTNER_TYPES[pid] ?? 'Partner',
+        }, { merge: true });
+      }
+      await AsyncStorage.setItem('partnerId', pid);
+      await AsyncStorage.setItem('partnerName', name);
+      await AsyncStorage.setItem('role', 'partner');
+      router.replace('/(partner)');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

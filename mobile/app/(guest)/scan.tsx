@@ -83,20 +83,25 @@ function SpendingChart({ data, labels }: { data: number[]; labels: string[] }) {
   );
 }
 
-// ─── partner data ────────────────────────────────────────────────────────────
-const PARTNER_NAMES: Record<string, string> = {
-  'partner-jungfraujoch': 'Jungfraujoch Railway',
-  'partner-victoria-restaurant': 'Hotel Victoria Restaurant',
-  'partner-interlaken-adventure': 'Interlaken Adventure Sports',
-  'partner-bakery': 'Grindelwald Bäckerei',
-};
-
-const PARTNERS = [
-  { id: 'partner-jungfraujoch', name: 'Jungfraujoch Railway', type: 'Transport', color: '#2563EB', imageUrl: 'https://images.unsplash.com/photo-1613989937169-d7030ca9f7ab?w=400&q=80' },
-  { id: 'partner-victoria-restaurant', name: 'Hotel Victoria Restaurant', type: 'Restaurant', color: '#DB2777', imageUrl: 'https://images.unsplash.com/photo-1733551629631-47d5923a2a98?w=400&q=80' },
-  { id: 'partner-interlaken-adventure', name: 'Interlaken Adventure Sports', type: 'Activity', color: '#0D9488', imageUrl: 'https://images.unsplash.com/photo-1605548109944-9040d0972bf5?w=400&q=80' },
-  { id: 'partner-bakery', name: 'Grindelwald Bäckerei', type: 'Food & Drink', color: '#D97706', imageUrl: 'https://images.unsplash.com/photo-1753011767176-7602e5e8619a?w=400&q=80' },
+// ─── partner data (visual fallback) ──────────────────────────────────────────
+const PARTNERS_META = [
+  { id: 'partner-jungfraujoch',         name: 'Jungfraujoch Railway',       type: 'Transport',    color: '#2563EB', imageUrl: 'https://images.unsplash.com/photo-1613989937169-d7030ca9f7ab?w=400&q=80' },
+  { id: 'partner-victoria-restaurant',  name: 'Hotel Victoria Restaurant',  type: 'Restaurant',   color: '#DB2777', imageUrl: 'https://images.unsplash.com/photo-1733551629631-47d5923a2a98?w=400&q=80' },
+  { id: 'partner-interlaken-adventure', name: 'Interlaken Adventure Sports', type: 'Activity',    color: '#0D9488', imageUrl: 'https://images.unsplash.com/photo-1605548109944-9040d0972bf5?w=400&q=80' },
+  { id: 'partner-bakery',               name: 'Grindelwald Bäckerei',       type: 'Food & Drink', color: '#D97706', imageUrl: 'https://images.unsplash.com/photo-1753011767176-7602e5e8619a?w=400&q=80' },
 ];
+// keep alias for QR legacy matching
+const PARTNERS = PARTNERS_META;
+
+// ─── Firestore partner type ───────────────────────────────────────────────────
+interface FSPartner {
+  id: string;
+  name: string;
+  type: string;
+  color: string;
+  imageUrl: string;
+  currentPrice: number;
+}
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -187,6 +192,9 @@ export default function ScanScreen() {
   const [scanned, setScanned] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
+  // firestore partners
+  const [fsPartners, setFsPartners] = useState<FSPartner[]>([]);
+
   // booking state
   const [checkIn, setCheckIn] = useState<Date>(() => addDays(new Date(), 1));
   const [checkOut, setCheckOut] = useState<Date>(() => addDays(new Date(), 2));
@@ -203,6 +211,25 @@ export default function ScanScreen() {
   const scanAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     AsyncStorage.getItem('userId').then(setUserId);
+    // Load partners from Firestore
+    if (FIREBASE_CONFIGURED && db) {
+      (async () => {
+        const { collection, getDocs } = await import('firebase/firestore');
+        const snap = await getDocs(collection(db!, 'partners'));
+        const fps: FSPartner[] = snap.docs.map(d => {
+          const meta = PARTNERS_META.find(p => p.id === d.id);
+          return {
+            id: d.id,
+            name: d.data().name ?? meta?.name ?? d.id,
+            type: d.data().type ?? meta?.type ?? 'Partner',
+            color: meta?.color ?? '#6B7280',
+            imageUrl: meta?.imageUrl ?? '',
+            currentPrice: d.data().currentPrice ?? 0,
+          };
+        });
+        if (fps.length > 0) setFsPartners(fps);
+      })();
+    }
     Animated.loop(
       Animated.sequence([
         Animated.timing(scanAnim, { toValue: 1, duration: 1800, useNativeDriver: true }),
@@ -336,9 +363,18 @@ export default function ScanScreen() {
     if (scanned) return;
     setScanned(true);
     setCameraActive(false);
-    const partner = PARTNERS.find(p => p.id === data || data.includes(p.id));
-    if (partner) {
-      handleSelectPartner(partner);
+    // Try JFP dynamic payment payload
+    try {
+      const payload = JSON.parse(data);
+      if (payload.id && payload.name && typeof payload.amount === 'number') {
+        handleAutoPayFromQR(payload);
+        return;
+      }
+    } catch {}
+    // Legacy: match by partnerId string
+    const meta = PARTNERS_META.find(p => p.id === data || data.includes(p.id));
+    if (meta) {
+      handleSelectPartner({ ...meta, currentPrice: 0 });
     } else {
       Alert.alert('QR Code scanné', `Contenu : ${data}`, [
         { text: 'OK', onPress: () => setScanned(false) },
@@ -363,11 +399,83 @@ export default function ScanScreen() {
     }
   };
 
+  // ── seamless auto-pay from QR payload ──────────────────────────────────────
+  const handleAutoPayFromQR = async (payload: { id: string; name: string; amount: number }) => {
+    const { id: pid, name: pname, amount: amt } = payload;
+    const raw = await AsyncStorage.getItem('wallet_data');
+    if (!raw) { Alert.alert('Erreur', 'Wallet introuvable'); setScanned(false); return; }
+    const wallet = JSON.parse(raw);
+    if (wallet.tokenBalance < amt) {
+      Alert.alert('Tokens insuffisants', `Il te faut ${amt} tokens mais tu n'as que ${wallet.tokenBalance}.`);
+      setScanned(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      wallet.tokenBalance -= amt;
+      wallet.pointsBalance = (wallet.pointsBalance ?? 0) + 10;
+      await AsyncStorage.setItem('wallet_data', JSON.stringify(wallet));
+
+      const rawBal = await AsyncStorage.getItem('partner_balances');
+      const balances: Record<string, number> = rawBal ? JSON.parse(rawBal) : {};
+      balances[pid] = (balances[pid] ?? 0) + amt;
+      await AsyncStorage.setItem('partner_balances', JSON.stringify(balances));
+
+      let txId = `tx-${Date.now()}`;
+      const guestName = wallet.name ?? 'Guest';
+
+      if (FIREBASE_CONFIGURED && db) {
+        const { doc, addDoc, collection, updateDoc, setDoc, increment, serverTimestamp } = await import('firebase/firestore');
+        const uId = userId ?? '';
+        if (uId) await updateDoc(doc(db!, 'users', uId), { tokenBalance: wallet.tokenBalance, pointsBalance: wallet.pointsBalance });
+        const txRef = await addDoc(collection(db!, 'transactions'), {
+          fromUserId: uId, toPartnerId: pid, amount: amt, pointsAwarded: 10,
+          type: 'payment', benefitId: null,
+          timestamp: serverTimestamp(), status: 'confirmed', partnerName: pname,
+        });
+        txId = txRef.id.slice(0, 8).toUpperCase();
+        // Write to partner doc — triggers real-time notification on partner device
+        await setDoc(doc(db!, 'partners', pid), {
+          tokenBalance: increment(amt),
+          name: pname,
+          lastPayment: { amount: amt, guestName, txId: txRef.id, timestamp: serverTimestamp() },
+        }, { merge: true });
+      } else {
+        const tx = {
+          id: txId, fromUserId: userId ?? '', toPartnerId: pid,
+          amount: amt, pointsAwarded: 10, type: 'payment', benefitId: null,
+          timestamp: new Date().toISOString(), status: 'confirmed', partnerName: pname,
+        };
+        const existing = JSON.parse((await AsyncStorage.getItem('transactions')) ?? '[]');
+        await AsyncStorage.setItem('transactions', JSON.stringify([tx, ...existing]));
+      }
+
+      await saveUserSnapshot();
+      const meta = PARTNERS_META.find(p => p.id === pid);
+      setSelectedPartner({ id: pid, name: pname, color: meta?.color ?? '#A3E635' });
+      showSuccess({ partnerName: pname, amount: amt, points: 10, txId, timestamp: new Date().toLocaleString(), mode: 'pay' });
+    } catch (e: any) {
+      Alert.alert('Erreur', e.message ?? 'Paiement échoué');
+      setScanned(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ── partner selection ──
-  const handleSelectPartner = (p: typeof PARTNERS[0]) => {
+  const handleSelectPartner = async (p: FSPartner) => {
     setPartnerId(p.id);
     setSelectedPartner({ id: p.id, name: p.name, color: p.color });
-    setAmount('');
+    // Pre-fill price from Firestore data or fetch it
+    if (p.currentPrice > 0) {
+      setAmount(String(p.currentPrice));
+    } else if (FIREBASE_CONFIGURED && db) {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const snap = await getDoc(doc(db!, 'partners', p.id));
+      setAmount(snap.exists() && snap.data().currentPrice ? String(snap.data().currentPrice) : '');
+    } else {
+      setAmount('');
+    }
     setAvailability(null);
     setCheckIn(addDays(new Date(), 1));
     setCheckOut(addDays(new Date(), 2));
@@ -437,10 +545,12 @@ export default function ScanScreen() {
     );
   };
 
-  const filteredPartners = PARTNERS.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.type.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Merge Firestore partners with local visual metadata
+  const displayPartners: FSPartner[] = (fsPartners.length > 0 ? fsPartners : PARTNERS_META.map(p => ({ ...p, currentPrice: 0 })))
+    .filter(p =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.type.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   // ── success screen (dark) ──
   if (successInfo) {
@@ -580,19 +690,29 @@ export default function ScanScreen() {
               />
             </View>
 
-            {/* partner list */}
-            {filteredPartners.map(p => (
+            {/* partner list — from Firestore */}
+            {displayPartners.map(p => (
               <TouchableOpacity
                 key={p.id}
                 style={s.partnerRow}
                 onPress={() => handleSelectPartner(p)}
                 activeOpacity={0.8}
               >
-                <Image source={{ uri: p.imageUrl }} style={s.partnerIcon} resizeMode="cover" />
+                {p.imageUrl
+                  ? <Image source={{ uri: p.imageUrl }} style={s.partnerIcon} resizeMode="cover" />
+                  : <View style={[s.partnerIcon, { backgroundColor: p.color, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ fontSize: 20 }}>🏪</Text></View>
+                }
                 <View style={s.partnerMid}>
                   <Text style={s.partnerName2}>{p.name}</Text>
-                  <Text style={s.partnerType}>{p.type}</Text>
+                  <Text style={s.partnerType}>
+                    {p.type}{p.currentPrice > 0 ? ` · ${p.currentPrice} tokens` : ''}
+                  </Text>
                 </View>
+                {p.currentPrice > 0 && (
+                  <View style={s.pricePill}>
+                    <Text style={s.pricePillText}>{p.currentPrice} 🪙</Text>
+                  </View>
+                )}
                 <ChevRightSvg />
               </TouchableOpacity>
             ))}
@@ -677,7 +797,7 @@ export default function ScanScreen() {
               {/* partner row */}
               <View style={s.modalPartner}>
                 <Image
-                  source={{ uri: PARTNERS.find(p => p.id === selectedPartner?.id)?.imageUrl }}
+                  source={{ uri: PARTNERS_META.find(p => p.id === selectedPartner?.id)?.imageUrl }}
                   style={s.modalPartnerIcon}
                   resizeMode="cover"
                 />
@@ -900,6 +1020,8 @@ const s = StyleSheet.create({
   partnerMid: { flex: 1 },
   partnerName2: { fontSize: 14, fontWeight: '600', color: '#111827' },
   partnerType: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  pricePill: { backgroundColor: '#F0FDF4', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, marginRight: 4 },
+  pricePillText: { fontSize: 12, fontWeight: '700', color: '#16A34A' },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
   modal: {
