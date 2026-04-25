@@ -119,19 +119,30 @@ export async function verifyProof(
 }
 
 // ─── stay validity check ──────────────────────────────────────────────────────
+
+// Parses ISO ("2026-04-20") or long-format ("Sunday, 20 April 2026") dates
+function parseStayDate(str: string): Date {
+  const iso = new Date(str);
+  if (!isNaN(iso.getTime())) return iso;
+  const m = str.match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+  if (m) return new Date(`${m[2]} ${m[1]}, ${m[3]}`);
+  return new Date(NaN);
+}
+
 export function isStayActive(checkIn: string, checkOut: string): boolean {
   const now   = new Date(); now.setHours(0, 0, 0, 0);
-  const start = new Date(checkIn);
-  const end   = new Date(checkOut);
+  const start = parseStayDate(checkIn);
+  const end   = parseStayDate(checkOut);
   return now >= start && now <= end;
 }
 
 export function stayStatus(checkIn: string, checkOut: string): { active: boolean; label: string; daysLeft: number } {
   const now   = new Date(); now.setHours(0, 0, 0, 0);
-  const start = new Date(checkIn);
-  const end   = new Date(checkOut);
+  const start = parseStayDate(checkIn);
+  const end   = parseStayDate(checkOut);
   const daysLeft = Math.ceil((end.getTime() - now.getTime()) / 86_400_000);
 
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return { active: false, label: 'Dates invalides', daysLeft: 0 };
   if (now < start) return { active: false, label: `Séjour commence le ${checkIn}`, daysLeft: 0 };
   if (now > end)   return { active: false, label: 'Séjour terminé', daysLeft: 0 };
   return { active: true, label: daysLeft === 1 ? 'Dernier jour du séjour' : `${daysLeft} jours restants`, daysLeft };
