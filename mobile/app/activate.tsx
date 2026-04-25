@@ -57,6 +57,7 @@ async function saveActivation(data: {
   checkIn: string;
   checkOut: string;
   hotel?: string;
+  nights?: number;
   activationType: 'invoice' | 'daypass';
 }) {
   const userId = await AsyncStorage.getItem('userId');
