@@ -40,6 +40,13 @@ const CalendarIcon = ({ color, size = 22 }: IC) => (
   </Svg>
 );
 
+const TicketIcon = ({ color, size = 22 }: IC) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M2 9a1 1 0 011-1h18a1 1 0 011 1v2a2 2 0 000 4v2a1 1 0 01-1 1H3a1 1 0 01-1-1v-2a2 2 0 000-4V9z" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+    <Path d="M9 12h6" stroke={color} strokeWidth="2" strokeLinecap="round" />
+  </Svg>
+);
+
 const ListIcon = ({ color, size = 22 }: IC) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path d="M8 6h13" stroke={color} strokeWidth="2" strokeLinecap="round" />
@@ -105,6 +112,10 @@ export default function PartnerLayout() {
       <Tabs.Screen
         name="bookings"
         options={{ headerTitle: 'Reservations', tabBarIcon: ({ focused }) => <TabIcon Icon={ListIcon} focused={focused} /> }}
+      />
+      <Tabs.Screen
+        name="voucher"
+        options={{ headerTitle: 'Guest Voucher', tabBarIcon: ({ focused }) => <TabIcon Icon={TicketIcon} focused={focused} /> }}
       />
     </Tabs>
   );
