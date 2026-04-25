@@ -5,9 +5,11 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "stripe": "^16",
-    "express": "^4",
     "cors": "^2",
-    "dotenv": "^16"
+    "dotenv": "^16",
+    "express": "^4",
+    "multer": "^2.1.1",
+    "pdf-parse": "^2.4.5",
+    "stripe": "^16"
   }
 }

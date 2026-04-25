@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 import { parseInvoice, type ParsedInvoice } from '@/lib/parseInvoice';
@@ -105,9 +105,45 @@ export default function ActivateScreen() {
       if (result.canceled) return;
 
       const asset = result.assets[0];
-      const content = await FileSystem.readAsStringAsync(asset.uri);
+      setFileName(asset.name ?? 'invoice');
 
-      setFileName(asset.name);
+      const isPdf = asset.mimeType === 'application/pdf'
+        || (asset.name ?? '').toLowerCase().endsWith('.pdf');
+
+      let content: string;
+
+      if (isPdf) {
+        // Send PDF to backend — pdf-parse extracts the text server-side
+        const formData = new FormData();
+        if ((asset as any).file) {
+          formData.append('file', (asset as any).file, asset.name ?? 'invoice.pdf');
+        } else {
+          formData.append('file', {
+            uri: asset.uri,
+            name: asset.name ?? 'invoice.pdf',
+            type: 'application/pdf',
+          } as any);
+        }
+        const parseRes = await fetch(`${BACKEND_URL}/parse-invoice`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!parseRes.ok) throw new Error('Could not parse PDF on server.');
+        const { text, error: parseErr } = await parseRes.json();
+        if (parseErr) throw new Error(parseErr);
+        content = text;
+      } else if ((asset as any).file) {
+        // Web + text file: use FileReader
+        content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onerror = reject;
+          reader.readAsText((asset as any).file);
+        });
+      } else {
+        // Mobile + text file: use expo-file-system
+        content = await FileSystem.readAsStringAsync(asset.uri);
+      }
 
       const inv = parseInvoice(content);
       if (!inv.nights || !inv.checkIn || !inv.checkOut) {

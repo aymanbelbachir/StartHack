@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const Stripe = require('stripe');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
 
 const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
@@ -20,6 +22,25 @@ const DAY_PACKS = {
   3: { amount: 5000,  label: '3-Day JungfrauPass' },
   7: { amount: 10000, label: '7-Day JungfrauPass' },
 };
+
+// Parse invoice file (PDF or text/md) and return raw text
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+app.post('/parse-invoice', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const isPdf = req.file.mimetype === 'application/pdf'
+      || req.file.originalname?.toLowerCase().endsWith('.pdf');
+    if (isPdf) {
+      const data = await pdfParse(req.file.buffer);
+      return res.json({ text: data.text });
+    }
+    // Plain text / markdown — return as-is
+    res.json({ text: req.file.buffer.toString('utf8') });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Create a Stripe Checkout Session and return its URL
 app.post('/create-checkout-session', async (req, res) => {
