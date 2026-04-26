@@ -8,6 +8,7 @@ interface ActivityCardProps {
   loading?: boolean;
   onRegister?: () => void;
   onUnregister?: () => void;
+  onPress?: () => void;
 }
 
 const CATEGORY_BG: Record<string, string> = {
@@ -15,13 +16,15 @@ const CATEGORY_BG: Record<string, string> = {
   Hiking:    '#0F766E',
   Nature:    '#065F46',
   Leisure:   '#1D4ED8',
+  Iconic:    '#7C3AED',
+  Scenic:    '#0369A1',
 };
 
-export function ActivityCard({ activity, registered = false, loading = false, onRegister, onUnregister }: ActivityCardProps) {
+export function ActivityCard({ activity, registered = false, loading = false, onRegister, onUnregister, onPress }: ActivityCardProps) {
   const heroBg = CATEGORY_BG[activity.category] ?? '#14532D';
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={styles.card}>
       <View style={styles.heroWrap}>
         {activity.imageUrl ? (
           <Image source={{ uri: activity.imageUrl }} style={styles.heroImg} resizeMode="cover" />
@@ -38,6 +41,9 @@ export function ActivityCard({ activity, registered = false, loading = false, on
             <Text style={styles.checkText}>✓</Text>
           </View>
         )}
+        <View style={styles.detailHint}>
+          <Text style={styles.detailHintText}>Tap for details</Text>
+        </View>
       </View>
 
       <View style={styles.content}>
@@ -46,7 +52,7 @@ export function ActivityCard({ activity, registered = false, loading = false, on
         <View style={styles.stats}>
           <View style={styles.statPill}>
             <Text style={styles.statLabel}>Location</Text>
-            <Text style={styles.statValue}>{activity.location}</Text>
+            <Text style={styles.statValue} numberOfLines={1}>{activity.location}</Text>
           </View>
           <View style={styles.statPill}>
             <Text style={styles.statLabel}>Duration</Text>
@@ -75,11 +81,11 @@ export function ActivityCard({ activity, registered = false, loading = false, on
           </View>
         ) : (
           <TouchableOpacity style={styles.btn} onPress={onRegister} activeOpacity={0.8}>
-            <Text style={styles.btnText}>Register</Text>
+            <Text style={styles.btnText}>Register · +{activity.pointsReward} pts</Text>
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -103,6 +109,11 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   checkText: { fontSize: 14, fontWeight: '800', color: '#111827' },
+  detailHint: {
+    position: 'absolute', bottom: 10, right: 12,
+    backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3,
+  },
+  detailHintText: { fontSize: 10, color: 'rgba(255,255,255,0.9)', fontWeight: '500' },
   content: { padding: 16, gap: 12 },
   title: { fontSize: 17, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
   stats: { flexDirection: 'row', gap: 8 },

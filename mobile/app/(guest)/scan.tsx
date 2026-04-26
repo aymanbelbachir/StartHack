@@ -8,7 +8,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 import { saveUserSnapshot } from '@/lib/userStore';
-import { isStayActive, stayStatus } from '@/lib/voucher';
+import { isStayActive } from '@/lib/voucher';
 import { getAvailability, createBooking } from '@/lib/bookingStore';
 import type { Availability, Booking } from '@/lib/bookingStore';
 import QRCode from 'react-native-qrcode-svg';
@@ -183,8 +183,6 @@ export default function ScanScreen() {
   const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
-  // ── stay status ──
-  const [stayInfo, setStayInfo] = useState<ReturnType<typeof stayStatus> | null>(null);
 
   // ── new ui state ──
   const [activeTab, setActiveTab] = useState<'scan' | 'manual'>('scan');
@@ -215,11 +213,6 @@ export default function ScanScreen() {
   const scanAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     AsyncStorage.getItem('userId').then(setUserId);
-    AsyncStorage.getItem('wallet_data').then(raw => {
-      if (!raw) return;
-      const w = JSON.parse(raw);
-      if (w.checkIn && w.checkOut) setStayInfo(stayStatus(w.checkIn, w.checkOut));
-    });
     // Load partners from Firestore
     if (FIREBASE_CONFIGURED && db) {
       (async () => {
@@ -300,7 +293,7 @@ export default function ScanScreen() {
     if (!raw) { Alert.alert('Error', 'Wallet not found'); return; }
     const wallet: WalletData = JSON.parse(raw);
     if (mode === 'pay' && (wallet as any).checkIn && (wallet as any).checkOut && !isStayActive((wallet as any).checkIn, (wallet as any).checkOut)) {
-      Alert.alert('Séjour inactif', `Votre carte n'est valable que du ${(wallet as any).checkIn} au ${(wallet as any).checkOut}.`);
+      Alert.alert('Stay Inactive', `Your card is only valid from ${(wallet as any).checkIn} to ${(wallet as any).checkOut}.`);
       return;
     }
     if (mode === 'pay') {
@@ -339,7 +332,7 @@ export default function ScanScreen() {
       if (!userSnap.exists()) throw new Error('User not found');
       const data = userSnap.data();
       if (mode === 'pay' && data.checkIn && data.checkOut && !isStayActive(data.checkIn, data.checkOut)) {
-        throw new Error(`Séjour inactif — carte valable du ${data.checkIn} au ${data.checkOut} uniquement.`);
+        throw new Error(`Stay inactive — card valid from ${data.checkIn} to ${data.checkOut} only.`);
       }
       if (mode === 'pay') {
         if (data.tokenBalance < tokenAmt) throw new Error(`Insufficient tokens (balance: ${data.tokenBalance})`);
@@ -392,7 +385,7 @@ export default function ScanScreen() {
     if (meta) {
       handleSelectPartner({ ...meta, currentPrice: 0 });
     } else {
-      Alert.alert('QR Code scanné', `Contenu : ${data}`, [
+      Alert.alert('QR Code Scanned', `Content: ${data}`, [
         { text: 'OK', onPress: () => setScanned(false) },
       ]);
     }
@@ -411,7 +404,7 @@ export default function ScanScreen() {
       quality: 1,
     });
     if (!result.canceled) {
-      Alert.alert('Image sélectionnée', 'Lecture de QR code depuis la galerie bientôt disponible.');
+      Alert.alert('Image Selected', 'QR code reading from gallery coming soon.');
     }
   };
 
@@ -419,15 +412,15 @@ export default function ScanScreen() {
   const handleAutoPayFromQR = async (payload: { id: string; name: string; amount: number }) => {
     const { id: pid, name: pname, amount: amt } = payload;
     const raw = await AsyncStorage.getItem('wallet_data');
-    if (!raw) { Alert.alert('Erreur', 'Wallet introuvable'); setScanned(false); return; }
+    if (!raw) { Alert.alert('Error', 'Wallet not found'); setScanned(false); return; }
     const wallet = JSON.parse(raw);
     if (wallet.checkIn && wallet.checkOut && !isStayActive(wallet.checkIn, wallet.checkOut)) {
-      Alert.alert('Séjour inactif', `Votre carte Jungfrau Pass n'est valable que du ${wallet.checkIn} au ${wallet.checkOut}.\n\nVous ne pouvez pas dépenser de tokens en dehors de votre séjour.`);
+      Alert.alert('Stay Inactive', `Your Jungfrau Pass is only valid from ${wallet.checkIn} to ${wallet.checkOut}.\n\nYou cannot spend tokens outside your stay.`);
       setScanned(false);
       return;
     }
     if (wallet.tokenBalance < amt) {
-      Alert.alert('Tokens insuffisants', `Il te faut ${amt} tokens mais tu n'as que ${wallet.tokenBalance}.`);
+      Alert.alert('Insufficient tokens', `You need ${amt} tokens but only have ${wallet.tokenBalance}.`);
       setScanned(false);
       return;
     }
@@ -476,7 +469,7 @@ export default function ScanScreen() {
       setSelectedPartner({ id: pid, name: pname, color: meta?.color ?? '#A3E635' });
       showSuccess({ partnerName: pname, amount: amt, points: 10, txId, timestamp: new Date().toLocaleString(), mode: 'pay' });
     } catch (e: any) {
-      Alert.alert('Erreur', e.message ?? 'Paiement échoué');
+      Alert.alert('Error', e.message ?? 'Payment failed');
       setScanned(false);
     } finally {
       setLoading(false);
@@ -629,14 +622,6 @@ export default function ScanScreen() {
           <Text style={s.headerSub}>Align the camera with the QR code or search a partner</Text>
         </View>
 
-        {/* stay status banner */}
-        {stayInfo && (
-          <View style={[s.stayBanner, stayInfo.active ? s.stayBannerActive : s.stayBannerInactive]}>
-            <Text style={[s.stayBannerText, stayInfo.active ? s.stayBannerTextActive : s.stayBannerTextInactive]}>
-              {stayInfo.active ? '🟢' : '🔴'} {stayInfo.label}
-            </Text>
-          </View>
-        )}
 
         {/* tab toggle */}
         <View style={s.tabRow}>
@@ -677,7 +662,7 @@ export default function ScanScreen() {
               ) : (
                 <View style={s.vfInner}>
                   <CamSvg />
-                  <Text style={s.vfText}>Appuie sur "Scan" pour ouvrir la caméra</Text>
+                  <Text style={s.vfText}>Tap "Scan" to open the camera</Text>
                 </View>
               )}
               <View style={[s.corner, s.cornerTL]} />
@@ -691,18 +676,18 @@ export default function ScanScreen() {
 
             {/* scan now */}
             <TouchableOpacity style={[s.scanNowBtn, cameraActive && s.scanNowBtnActive]} onPress={handleScanNow} activeOpacity={0.85}>
-              <Text style={s.scanNowText}>{cameraActive ? 'Arrêter le scan' : 'Scan Now'}</Text>
+              <Text style={s.scanNowText}>{cameraActive ? 'Stop Scan' : 'Scan Now'}</Text>
             </TouchableOpacity>
 
             {/* utility buttons */}
             <View style={s.utilRow}>
               <TouchableOpacity style={s.utilBtn} onPress={handleGallery} activeOpacity={0.8}>
                 <ImgSvg />
-                <Text style={s.utilLabel}>Galerie</Text>
+                <Text style={s.utilLabel}>Gallery</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.utilBtn} onPress={() => setActiveTab('manual')} activeOpacity={0.8}>
                 <CardSvg />
-                <Text style={s.utilLabel}>Manuel</Text>
+                <Text style={s.utilLabel}>Manual</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

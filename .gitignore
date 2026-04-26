@@ -6,6 +6,8 @@
 # Dependencies
 node_modules/
 mobile/node_modules/
+package-lock.json
+mobile/package-lock.json
 
 # Expo
 mobile/.expo/

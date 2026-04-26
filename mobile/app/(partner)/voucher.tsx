@@ -75,9 +75,9 @@ export default function VoucherScreen() {
       }
       setPubB64(pub);
       setHasKey(true);
-      Alert.alert('Clé générée ✅', 'Votre clé publique a été enregistrée sur le serveur Jungfrau Park.');
+      Alert.alert('Key Generated ✅', 'Your public key has been registered on the Jungfrau Park server.');
     } catch (e: any) {
-      Alert.alert('Erreur', e.message ?? 'Génération échouée');
+      Alert.alert('Error', e.message ?? 'Generation failed');
     } finally {
       setGenerating(false);
     }
@@ -85,9 +85,9 @@ export default function VoucherScreen() {
 
   // ── generate voucher ──────────────────────────────────────────────────────
   const handleGenerate = async () => {
-    if (!guestName.trim()) { Alert.alert('Champ manquant', 'Entrez le nom du client'); return; }
+    if (!guestName.trim()) { Alert.alert('Missing field', 'Enter the guest name'); return; }
     const privRaw = await AsyncStorage.getItem('hotel_private_key');
-    if (!privRaw) { Alert.alert('Erreur', 'Clé privée introuvable'); return; }
+    if (!privRaw) { Alert.alert('Error', 'Private key not found'); return; }
     setGenerating(true);
     try {
       const privJwk: JsonWebKey = JSON.parse(privRaw);
@@ -108,7 +108,7 @@ export default function VoucherScreen() {
       setVoucher(v);
       setProofMD(generateProofMD(data, v));
     } catch (e: any) {
-      Alert.alert('Erreur signature', e.message ?? 'Échec');
+      Alert.alert('Signing error', e.message ?? 'Failed');
     } finally {
       setGenerating(false);
     }
@@ -116,21 +116,21 @@ export default function VoucherScreen() {
 
   const handleShare = async () => {
     if (!proofMD) return;
-    await Share.share({ message: proofMD, title: 'Jungfrau Pass — Preuve de Paiement' });
+    await Share.share({ message: proofMD, title: 'Jungfrau Pass — Proof of Payment' });
   };
 
   // ── if no key yet ─────────────────────────────────────────────────────────
   if (!hasKey) {
     return (
       <View style={s.center}>
-        <Text style={s.setupTitle}>Convention initiale</Text>
+        <Text style={s.setupTitle}>Initial Setup</Text>
         <Text style={s.setupSub}>
-          Générez votre paire de clés ECDSA P-256.{'\n'}
-          La clé publique sera partagée avec le serveur Jungfrau Park.{'\n'}
-          La clé privée reste sur cet appareil.
+          Generate your ECDSA P-256 key pair.{'\n'}
+          The public key will be shared with the Jungfrau Park server.{'\n'}
+          The private key stays on this device.
         </Text>
         <TouchableOpacity style={s.setupBtn} onPress={handleGenerateKeys} disabled={generating} activeOpacity={0.85}>
-          <Text style={s.setupBtnText}>{generating ? 'Génération…' : 'Générer ma paire de clés'}</Text>
+          <Text style={s.setupBtnText}>{generating ? 'Generating…' : 'Generate my key pair'}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -142,31 +142,31 @@ export default function VoucherScreen() {
 
         {/* header */}
         <View style={s.header}>
-          <Text style={s.headerTitle}>Émettre un bon de réservation</Text>
-          <Text style={s.headerSub}>Signé avec votre clé privée · vérifiable hors-ligne</Text>
+          <Text style={s.headerTitle}>Issue a booking voucher</Text>
+          <Text style={s.headerSub}>Signed with your private key · verifiable offline</Text>
         </View>
 
         {/* public key info */}
         <View style={s.keyCard}>
-          <Text style={s.keyLabel}>🔑 Clé publique enregistrée</Text>
+          <Text style={s.keyLabel}>🔑 Public key registered</Text>
           <Text style={s.keyVal} numberOfLines={2}>{pubB64.slice(0, 48)}…</Text>
-          <Text style={s.keySub}>Convention active avec Jungfrau Park ✅</Text>
+          <Text style={s.keySub}>Active agreement with Jungfrau Park ✅</Text>
         </View>
 
         {/* form */}
         <View style={s.card}>
-          <Text style={s.cardTitle}>Détails du séjour</Text>
+          <Text style={s.cardTitle}>Stay Details</Text>
 
           <View style={s.field}>
-            <Text style={s.label}>Nom du client</Text>
+            <Text style={s.label}>Guest Name</Text>
             <TextInput
               style={s.input} value={guestName} onChangeText={setGuestName}
-              placeholder="Alice Dupont" placeholderTextColor="#9CA3AF" autoCapitalize="words"
+              placeholder="Alice Smith" placeholderTextColor="#9CA3AF" autoCapitalize="words"
             />
           </View>
 
           <View style={s.field}>
-            <Text style={s.label}>Numéro de chambre</Text>
+            <Text style={s.label}>Room Number</Text>
             <TextInput
               style={s.input} value={chambre} onChangeText={setChambre}
               placeholder="101" placeholderTextColor="#9CA3AF" keyboardType="numeric"
@@ -193,9 +193,9 @@ export default function VoucherScreen() {
             </View>
           </View>
 
-          {/* Montant CHF */}
+          {/* Amount CHF */}
           <View style={s.field}>
-            <Text style={s.label}>Montant réglé (CHF)</Text>
+            <Text style={s.label}>Amount Paid (CHF)</Text>
             <View style={s.datePicker}>
               <TouchableOpacity style={s.dateArrow} onPress={() => setMontant(m => Math.max(50, m - 50))}><MinusIcon /></TouchableOpacity>
               <Text style={s.dateVal}>{montant} CHF</Text>
@@ -205,7 +205,7 @@ export default function VoucherScreen() {
 
           {/* Tokens */}
           <View style={s.field}>
-            <Text style={s.label}>Tokens Jungfrau Pass accordés</Text>
+            <Text style={s.label}>Jungfrau Pass Tokens Granted</Text>
             <View style={s.datePicker}>
               <TouchableOpacity style={s.dateArrow} onPress={() => setTokens(t => Math.max(1, t - 10))}><MinusIcon /></TouchableOpacity>
               <Text style={s.dateVal}>{tokens} 🪙</Text>
@@ -215,42 +215,42 @@ export default function VoucherScreen() {
 
           {/* Summary */}
           <View style={s.summary}>
-            <Text style={s.summaryText}>{nights} nuit{nights > 1 ? 's' : ''} · chambre {chambre} · {montant} CHF</Text>
+            <Text style={s.summaryText}>{nights} night{nights > 1 ? 's' : ''} · room {chambre} · {montant} CHF</Text>
             <Text style={s.summaryText}>{guestName || '—'} · {tokens} tokens 🪙</Text>
           </View>
 
           <TouchableOpacity style={[s.genBtn, generating && { opacity: 0.5 }]} onPress={handleGenerate} disabled={generating} activeOpacity={0.85}>
-            <Text style={s.genBtnText}>{generating ? 'Signature en cours…' : 'Signer et générer le bon'}</Text>
+            <Text style={s.genBtnText}>{generating ? 'Signing…' : 'Sign and generate voucher'}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Voucher result */}
         {voucher && proofMD && (
           <View style={s.voucherCard}>
-            <Text style={s.voucherTitle}>✅ Preuve de paiement signée</Text>
-            <Text style={s.voucherSub}>QR code à scanner · ou partager le .md à l'invité</Text>
+            <Text style={s.voucherTitle}>✅ Signed Proof of Payment</Text>
+            <Text style={s.voucherSub}>Scan QR code · or share the .md with the guest</Text>
 
             <View style={s.qrBox}>
               <QRCode value={voucher} size={220} color="#111827" backgroundColor="#FFFFFF" />
             </View>
 
             <View style={s.voucherInfo}>
-              <Row label="Client"   val={guestName} />
-              <Row label="Hôtel"    val={partnerName} />
+              <Row label="Guest"    val={guestName} />
+              <Row label="Hotel"    val={partnerName} />
               <Row label="Check-in" val={toISO(checkIn)} />
               <Row label="Check-out" val={toISO(checkOut)} />
-              <Row label="Nuits"    val={String(nights)} />
-              <Row label="Montant"  val={`${montant} CHF`} />
+              <Row label="Nights"   val={String(nights)} />
+              <Row label="Amount"   val={`${montant} CHF`} />
               <Row label="Tokens"   val={`${tokens} 🪙`} />
-              <Row label="Expire"   val="dans 30 jours" />
+              <Row label="Expires"  val="in 30 days" />
             </View>
 
             <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.85}>
-              <Text style={s.shareBtnText}>Partager la facture .md</Text>
+              <Text style={s.shareBtnText}>Share invoice .md</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.resetBtn} onPress={() => { setVoucher(null); setProofMD(null); setGuestName(''); }} activeOpacity={0.8}>
-              <Text style={s.resetBtnText}>Nouveau bon</Text>
+              <Text style={s.resetBtnText}>New voucher</Text>
             </TouchableOpacity>
           </View>
         )}

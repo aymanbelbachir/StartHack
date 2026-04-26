@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView,
-  Platform, ScrollView, TouchableOpacity, ImageBackground, ActivityIndicator,
+  Platform, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
+import type { Video as VideoType } from 'expo-av';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from '@/components/Button';
@@ -46,6 +48,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const videoRef = useRef<VideoType>(null);
 
   useEffect(() => { setChecking(false); }, []);
 
@@ -206,15 +209,21 @@ export default function AuthScreen() {
 
   return (
     <View style={styles.container}>
-      <ImageBackground
-        source={{ uri: 'https://images.unsplash.com/photo-1666030910636-6291b581962e?w=800&q=80' }}
-        style={styles.hero}
-        resizeMode="cover"
-      >
+      <View style={styles.hero}>
+        <Video
+          source={require('../assets/bg_video.mp4')}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay
+          isLooping
+          isMuted
+          onReadyForDisplay={() => videoRef.current?.setPositionAsync(40000)}
+          ref={videoRef}
+        />
         <View style={styles.heroOverlay} />
         <Text style={styles.withUs}>WITH US</Text>
         <Text style={styles.heroTitle}>Discover{'\n'}The Jungfrau{'\n'}Region</Text>
-      </ImageBackground>
+      </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheet}>
         <ScrollView
