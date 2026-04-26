@@ -2,6 +2,8 @@
 
 > **Your Alps. One Tap.**
 
+[![JungfrauPass Demo Video](https://placehold.co/800x450/202020/FFFFFF.png?text=Play+Demo+Video)](https://drive.google.com/file/d/1NvBseUCMbsd0f-StBzOr5uzaAcf0dQLF/view?usp=sharing)
+
 JungfrauPass is a digital guest wallet built for the Jungfrau Region. It replaces fragmented paper vouchers and high-fee foreign card payments with a single mobile app — one wallet, every benefit, every partner, every activity in the region.
 
 Built in 24 hours at START Hack Tour · Interlaken · April 24–26, 2026.
@@ -43,7 +45,7 @@ Built in 24 hours at START Hack Tour · Interlaken · April 24–26, 2026.
 
 ## Project structure
 
-```
+```text
 StartHack/
 ├── mobile/          # React Native / Expo app
 │   ├── app/
@@ -75,58 +77,3 @@ StartHack/
 │       └── landmarks.ts           # Quest locations
 └── backend/         # Express server
     └── server.js                  # Stripe checkout + invoice parsing endpoints
-```
-
----
-
-## Running locally
-
-### Mobile app
-
-```bash
-cd mobile
-npm install --legacy-peer-deps
-npx expo start --tunnel
-```
-
-Scan the QR code with the Expo Go app on your phone.
-
-### Backend
-
-```bash
-cd backend
-npm install
-# create a .env file with:
-# STRIPE_SECRET_KEY=sk_test_...
-node server.js
-```
-
-Set `EXPO_PUBLIC_BACKEND_URL` in `mobile/.env.local` to your backend URL.
-
----
-
-## Key flows
-
-**Stay activation**
-Guest uploads hotel invoice (PDF or text) → backend parses check-in / check-out dates → ECDSA signature from hotel verified locally → tokens credited (10 per night).
-
-**Token payment**
-Guest scans partner QR → amount confirmed → Firestore atomic write deducts guest balance and credits partner → partner dashboard notified in real time.
-
-**Stripe top-up**
-Guest selects a token pack → Stripe Checkout opens in browser → payment confirmed server-side → tokens credited to Firestore wallet. Packs: 10 tokens / CHF 1.00 · 50 tokens / CHF 4.99 · 100 tokens / CHF 8.99.
-
-**Fee reduction**
-Traditional foreign card: 2–3.5% on every partner transaction. JungfrauPass: one Stripe fee on wallet top-up (~1.4% + CHF 0.25), then zero per-transaction fees inside the ecosystem. Partners pay a flat monthly settlement rate below 1%.
-
----
-
-## Deployment
-
-The backend is a standard Express app with `module.exports = app` — deploy to Vercel with a single `vercel.json` config file. The mobile app builds to iOS and Android via Expo EAS Build. Firebase Firestore is already cloud-hosted with no infrastructure to manage.
-
----
-
-## Team
-
-Built at START Hack 2026 — Interlaken, Switzerland.
