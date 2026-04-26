@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const Stripe = require('stripe');
 const multer = require('multer');
-const pdfParse = require('pdf-parse');
+
 
 const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
@@ -29,12 +29,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 app.post('/parse-invoice', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const isPdf = req.file.mimetype === 'application/pdf'
-      || req.file.originalname?.toLowerCase().endsWith('.pdf');
-    if (isPdf) {
-      const data = await pdfParse(req.file.buffer);
-      return res.json({ text: data.text });
-    }
+    
     // Plain text / markdown — return as-is
     res.json({ text: req.file.buffer.toString('utf8') });
   } catch (err) {
