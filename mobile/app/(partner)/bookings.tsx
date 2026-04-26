@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getPartnerBookings, Booking } from '@/lib/bookingStore';
@@ -97,6 +98,7 @@ export default function BookingsScreen() {
   );
 
   const totalTokens = bookings.reduce((sum, b) => sum + b.totalTokens, 0);
+  const insets = useSafeAreaInsets();
 
   if (loading) {
     return (
@@ -109,7 +111,7 @@ export default function BookingsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.headerTitle}>Reservations</Text>
         <Text style={styles.headerSub}>All confirmed bookings</Text>
       </View>
@@ -159,7 +161,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   header: {
-    paddingTop: 56,
     paddingHorizontal: 20,
     paddingBottom: 8,
   },
@@ -236,7 +237,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#3F6212',
-    fontVariant: ['tabular-nums'],
     letterSpacing: 1,
   },
   confirmedBadge: {

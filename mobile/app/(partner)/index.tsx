@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useNavigation } from 'expo-router';
+import { StackActions } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 import Svg, { Path } from 'react-native-svg';
@@ -18,26 +20,14 @@ const PlusIcon = () => (
 );
 
 export default function PartnerDashboard() {
+  const navigation = useNavigation();
   const [partnerId, setPartnerId]     = useState('');
   const [partnerName, setPartnerName] = useState('');
   const [tokenBalance, setTokenBalance] = useState(0);
   const [currentPrice, setCurrentPrice] = useState(10);
-  const [lastPayment, setLastPayment]   = useState<{ amount: number; guestName: string } | null>(null);
 
-  const bannerAnim   = useRef(new Animated.Value(-140)).current;
   const lastTxIdRef  = useRef<string | null>(null);
   const listenerRef  = useRef<(() => void) | undefined>(undefined);
-
-  // ── animated payment banner ───────────────────────────────────────────────
-  const showBanner = (p: { amount: number; guestName: string }) => {
-    setLastPayment(p);
-    bannerAnim.setValue(-140);
-    Animated.sequence([
-      Animated.spring(bannerAnim, { toValue: 0, useNativeDriver: true, tension: 55, friction: 9 }),
-      Animated.delay(3800),
-      Animated.timing(bannerAnim, { toValue: -140, duration: 320, useNativeDriver: true }),
-    ]).start();
-  };
 
   // ── load initial data ──────────────────────────────────────────────────────
   const loadInitial = useCallback(async () => {
@@ -76,12 +66,7 @@ export default function PartnerDashboard() {
         setTokenBalance(data.tokenBalance ?? 0);
         if (data.currentPrice) setCurrentPrice(data.currentPrice);
 
-        // New payment detected
-        const lp = data.lastPayment;
-        if (lp && lp.txId && lp.txId !== lastTxIdRef.current) {
-          lastTxIdRef.current = lp.txId;
-          showBanner({ amount: lp.amount, guestName: lp.guestName ?? 'Guest' });
-        }
+        if (data.lastPayment?.txId) lastTxIdRef.current = data.lastPayment.txId;
       });
     })();
 
@@ -100,28 +85,14 @@ export default function PartnerDashboard() {
   };
 
   const qrValue = JSON.stringify({ id: partnerId, name: partnerName, amount: currentPrice });
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={{ flex: 1 }}>
-
-      {/* ── Payment received banner ── */}
-      <Animated.View style={[styles.banner, { transform: [{ translateY: bannerAnim }] }]}>
-        <View style={styles.bannerRow}>
-          <Text style={styles.bannerEmoji}>💸</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.bannerTitle}>Payment Received!</Text>
-            <Text style={styles.bannerSub}>{lastPayment?.guestName} · Confirmed on Firebase</Text>
-          </View>
-          <View style={styles.bannerPill}>
-            <Text style={styles.bannerPillText}>+{lastPayment?.amount} 🪙</Text>
-          </View>
-        </View>
-      </Animated.View>
-
       <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* ── Hero ── */}
-        <View style={styles.hero}>
+        <View style={[styles.hero, { paddingTop: insets.top + 16 }]}>
           <Text style={styles.heroLabel}>PARTNER DASHBOARD</Text>
           <Text style={styles.heroName}>{partnerName || '—'}</Text>
           <Text style={styles.heroId}>{partnerId}</Text>
@@ -137,7 +108,12 @@ export default function PartnerDashboard() {
           <Text style={styles.cardSub}>Guests scan your QR — they pay this amount instantly, no input needed</Text>
 
           <View style={styles.stepper}>
-            <TouchableOpacity style={styles.stepBtn} onPress={() => updatePrice(currentPrice - 1)} activeOpacity={0.75}>
+            <TouchableOpacity
+              style={[styles.stepBtn, currentPrice <= 1 && styles.stepBtnDisabled]}
+              onPress={() => updatePrice(currentPrice - 1)}
+              activeOpacity={0.75}
+              disabled={currentPrice <= 1}
+            >
               <MinusIcon />
             </TouchableOpacity>
             <View style={styles.stepCenter}>
@@ -173,7 +149,7 @@ export default function PartnerDashboard() {
               <QRCode value={qrValue} size={210} color="#111827" backgroundColor="#FFFFFF" />
             ) : (
               <View style={{ width: 210, height: 210, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#D1D5DB' }}>Loading…</Text>
+                <ActivityIndicator color="#84CC16" size="large" />
               </View>
             )}
           </View>
@@ -192,22 +168,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   content: { paddingBottom: 120 },
 
-  banner: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200,
-    backgroundColor: '#0D2818', paddingHorizontal: 16,
-    paddingTop: 54, paddingBottom: 14,
-  },
-  bannerRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#166534', borderRadius: 18, padding: 14,
-  },
-  bannerEmoji: { fontSize: 30 },
-  bannerTitle: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
-  bannerSub: { fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
-  bannerPill: { backgroundColor: '#84CC16', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  bannerPillText: { fontSize: 13, fontWeight: '800', color: '#111827' },
-
-  hero: { backgroundColor: '#111827', paddingHorizontal: 24, paddingTop: 52, paddingBottom: 24, gap: 4 },
+  hero: { backgroundColor: '#111827', paddingHorizontal: 24, paddingBottom: 24, gap: 4 },
   heroLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '700', letterSpacing: 3 },
   heroName: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', letterSpacing: -0.4, marginTop: 6 },
   heroId: { color: 'rgba(255,255,255,0.28)', fontSize: 12 },
@@ -238,6 +199,7 @@ const styles = StyleSheet.create({
     width: 50, height: 50, borderRadius: 15, backgroundColor: '#E5E7EB',
     alignItems: 'center', justifyContent: 'center',
   },
+  stepBtnDisabled: { opacity: 0.35 },
   stepCenter: { alignItems: 'center' },
   stepVal: { fontSize: 46, fontWeight: '800', color: '#111827', lineHeight: 52 },
   stepUnit: { fontSize: 12, color: '#9CA3AF', fontWeight: '600', marginTop: -4 },

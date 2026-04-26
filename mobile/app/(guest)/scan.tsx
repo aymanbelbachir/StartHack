@@ -8,7 +8,6 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
 import { saveUserSnapshot } from '@/lib/userStore';
-import { isStayActive } from '@/lib/voucher';
 import { getAvailability, createBooking } from '@/lib/bookingStore';
 import type { Availability, Booking } from '@/lib/bookingStore';
 import QRCode from 'react-native-qrcode-svg';
@@ -292,10 +291,6 @@ export default function ScanScreen() {
     const raw = await AsyncStorage.getItem('wallet_data');
     if (!raw) { Alert.alert('Error', 'Wallet not found'); return; }
     const wallet: WalletData = JSON.parse(raw);
-    if (mode === 'pay' && (wallet as any).checkIn && (wallet as any).checkOut && !isStayActive((wallet as any).checkIn, (wallet as any).checkOut)) {
-      Alert.alert('Stay Inactive', `Your card is only valid from ${(wallet as any).checkIn} to ${(wallet as any).checkOut}.`);
-      return;
-    }
     if (mode === 'pay') {
       if (wallet.tokenBalance < tokenAmt) { Alert.alert('Insufficient tokens', `Balance: ${wallet.tokenBalance}`); return; }
       wallet.tokenBalance -= tokenAmt;
@@ -331,9 +326,6 @@ export default function ScanScreen() {
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) throw new Error('User not found');
       const data = userSnap.data();
-      if (mode === 'pay' && data.checkIn && data.checkOut && !isStayActive(data.checkIn, data.checkOut)) {
-        throw new Error(`Stay inactive — card valid from ${data.checkIn} to ${data.checkOut} only.`);
-      }
       if (mode === 'pay') {
         if (data.tokenBalance < tokenAmt) throw new Error(`Insufficient tokens (balance: ${data.tokenBalance})`);
         // Deduct from guest
@@ -348,6 +340,15 @@ export default function ScanScreen() {
         type: mode === 'pay' ? 'payment' : 'benefit_redemption', benefitId: null,
         timestamp: serverTimestamp(), status: 'confirmed', partnerName,
       });
+      // keep local cache in sync so home screen dropdown shows it
+      const localTx = {
+        id: docRef.id, fromUserId: userId, toPartnerId: partnerId,
+        amount: mode === 'pay' ? tokenAmt : 0, pointsAwarded: mode === 'pay' ? 10 : 0,
+        type: mode === 'pay' ? 'payment' : 'benefit_redemption', benefitId: null,
+        timestamp: new Date().toISOString(), status: 'confirmed', partnerName,
+      };
+      const existing = JSON.parse((await AsyncStorage.getItem('transactions')) ?? '[]');
+      await AsyncStorage.setItem('transactions', JSON.stringify([localTx, ...existing]));
       showSuccess({ partnerName, amount: tokenAmt, points: mode === 'pay' ? 10 : 0, txId: docRef.id.slice(0, 8).toUpperCase(), timestamp: new Date().toLocaleString(), mode });
     } catch (e: any) {
       Alert.alert('Error', e.message ?? 'Transaction failed');
@@ -414,11 +415,6 @@ export default function ScanScreen() {
     const raw = await AsyncStorage.getItem('wallet_data');
     if (!raw) { Alert.alert('Error', 'Wallet not found'); setScanned(false); return; }
     const wallet = JSON.parse(raw);
-    if (wallet.checkIn && wallet.checkOut && !isStayActive(wallet.checkIn, wallet.checkOut)) {
-      Alert.alert('Stay Inactive', `Your Jungfrau Pass is only valid from ${wallet.checkIn} to ${wallet.checkOut}.\n\nYou cannot spend tokens outside your stay.`);
-      setScanned(false);
-      return;
-    }
     if (wallet.tokenBalance < amt) {
       Alert.alert('Insufficient tokens', `You need ${amt} tokens but only have ${wallet.tokenBalance}.`);
       setScanned(false);

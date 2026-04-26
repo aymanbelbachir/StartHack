@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Alert, ActivityIndicator,
@@ -9,8 +9,6 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import Svg, { Path } from 'react-native-svg';
 import { FIREBASE_CONFIGURED, db } from '@/lib/firebase';
-import { isStayActive } from '@/lib/parseInvoice';
-
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://localhost:3000';
 
 const TOKEN_PACKS = [
@@ -29,15 +27,6 @@ const BackIcon = () => (
 // ─── screen ───────────────────────────────────────────────────────────────────
 export default function TopUpScreen() {
   const [loading, setLoading] = useState<number | null>(null);
-  const [stayActive, setStayActive] = useState<boolean | null>(null); // null = loading
-
-  useEffect(() => {
-    AsyncStorage.getItem('wallet_data').then(raw => {
-      if (!raw) { setStayActive(false); return; }
-      const w = JSON.parse(raw);
-      setStayActive(w.checkIn && w.checkOut ? isStayActive(w.checkIn, w.checkOut) : false);
-    });
-  }, []);
 
   const handleBuy = async (pack: typeof TOKEN_PACKS[number]) => {
     setLoading(pack.tokens);
@@ -49,11 +38,11 @@ export default function TopUpScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tokens: pack.tokens, redirectUrl }),
       });
+      const rawText = await res.text();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? 'Backend error');
+        throw new Error(`Backend ${res.status}: ${rawText.slice(0, 200)}`);
       }
-      const { url } = await res.json();
+      const { url } = JSON.parse(rawText);
 
       // 2. Open Stripe Checkout in browser; wait for deep-link redirect
       const result = await WebBrowser.openAuthSessionAsync(url, redirectUrl);
@@ -125,24 +114,15 @@ export default function TopUpScreen() {
           </Text>
         </View>
 
-        {stayActive === false && (
-          <View style={styles.blockedCard}>
-            <Text style={styles.blockedTitle}>Outside your stay period</Text>
-            <Text style={styles.blockedText}>
-              Token top-up is only available during your stay. You can still spend existing tokens.
-            </Text>
-          </View>
-        )}
-
         <Text style={styles.sectionLabel}>CHOOSE A PACK</Text>
 
         {TOKEN_PACKS.map((pack) => {
           const isProcessing = loading === pack.tokens;
-          const disabled = loading !== null || stayActive === false;
+          const disabled = loading !== null;
           return (
             <TouchableOpacity
               key={pack.tokens}
-              style={[styles.card, pack.popular && styles.cardPopular, stayActive === false && styles.cardDisabled]}
+              style={[styles.card, pack.popular && styles.cardPopular]}
               onPress={() => !disabled && handleBuy(pack)}
               activeOpacity={0.85}
               disabled={disabled}
@@ -251,11 +231,4 @@ const styles = StyleSheet.create({
   testText: { fontSize: 12, color: '#78350F', lineHeight: 18 },
   testBold: { fontWeight: '800' },
   secureNote: { textAlign: 'center', fontSize: 11, color: '#9CA3AF', paddingTop: 20 },
-  blockedCard: {
-    marginHorizontal: 16, marginTop: 8, backgroundColor: '#FEF2F2',
-    borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FECACA', gap: 4,
-  },
-  blockedTitle: { fontSize: 13, fontWeight: '700', color: '#991B1B' },
-  blockedText: { fontSize: 12, color: '#7F1D1D', lineHeight: 18 },
-  cardDisabled: { opacity: 0.4 },
 });

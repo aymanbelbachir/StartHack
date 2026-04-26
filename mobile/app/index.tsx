@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView,
   Platform, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
-import type { Video as VideoType } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from '@/components/Button';
@@ -48,7 +47,12 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const videoRef = useRef<VideoType>(null);
+  const videoPlayer = useVideoPlayer(require('../assets/bg_video.mp4'), player => {
+    player.loop = true;
+    player.muted = true;
+    player.currentTime = 40;
+    player.play();
+  });
 
   useEffect(() => { setChecking(false); }, []);
 
@@ -210,15 +214,11 @@ export default function AuthScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
-        <Video
-          source={require('../assets/bg_video.mp4')}
+        <VideoView
+          player={videoPlayer}
           style={StyleSheet.absoluteFillObject}
-          resizeMode={ResizeMode.COVER}
-          shouldPlay
-          isLooping
-          isMuted
-          onReadyForDisplay={() => videoRef.current?.setPositionAsync(40000)}
-          ref={videoRef}
+          contentFit="cover"
+          nativeControls={false}
         />
         <View style={styles.heroOverlay} />
         <Text style={styles.withUs}>WITH US</Text>

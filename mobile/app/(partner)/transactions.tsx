@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View, StyleSheet } from 'react-native';
+import { ScrollView, Text, View, StyleSheet, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TransactionItem } from '@/components/TransactionItem';
 import { usePartnerTransactions } from '@/hooks/useTransactions';
@@ -21,7 +21,7 @@ export default function PartnerTransactionsScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <Text style={styles.statusText}>Loading...</Text>
+          <ActivityIndicator size="large" color="#84CC16" />
         </View>
       ) : transactions.length === 0 ? (
         <View style={styles.empty}>
@@ -41,8 +41,7 @@ const styles = StyleSheet.create({
   header: { paddingTop: 20, paddingBottom: 20, gap: 4 },
   title: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
   sub: { fontSize: 13, color: '#6B7280' },
-  center: { alignItems: 'center', paddingTop: 60 },
-  statusText: { fontSize: 15, color: '#6B7280' },
+  center: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   empty: {
     backgroundColor: '#FFFFFF', borderRadius: 24, padding: 32,
     alignItems: 'center', gap: 10, marginTop: 16,

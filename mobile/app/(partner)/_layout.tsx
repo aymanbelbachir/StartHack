@@ -1,122 +1,110 @@
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
+import { BlurView } from 'expo-blur';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 
 type IC = { color: string; size?: number };
 
 const GridIcon = ({ color, size = 22 }: IC) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Rect x="3" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth="2" />
-    <Rect x="14" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth="2" />
-    <Rect x="3" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth="2" />
-    <Rect x="14" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth="2" />
+    <Rect x="3" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth="1.6" />
+    <Rect x="14" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth="1.6" />
+    <Rect x="3" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth="1.6" />
+    <Rect x="14" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth="1.6" />
   </Svg>
 );
 
 const ActivityIcon = ({ color, size = 22 }: IC) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
 );
 
 const CheckCircleIcon = ({ color, size = 22 }: IC) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2" />
-    <Path d="M9 12l2 2 4-4" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Circle cx="12" cy="12" r="9.5" stroke={color} strokeWidth="1.6" />
+    <Path d="M9 12l2 2 4-4" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
 );
 
-const CalendarIcon = ({ color, size = 22 }: IC) => (
+const PersonIcon = ({ color, size = 22 }: IC) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Rect x="3" y="4" width="18" height="17" rx="2" stroke={color} strokeWidth="2" />
-    <Path d="M3 9h18" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M8 2v4" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M16 2v4" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M7 13h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M11 13h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M15 13h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M7 17h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M11 17h2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Circle cx="12" cy="8" r="4" stroke={color} strokeWidth="1.6" />
+    <Path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
   </Svg>
 );
 
-const TicketIcon = ({ color, size = 22 }: IC) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path d="M2 9a1 1 0 011-1h18a1 1 0 011 1v2a2 2 0 000 4v2a1 1 0 01-1 1H3a1 1 0 01-1-1v-2a2 2 0 000-4V9z" stroke={color} strokeWidth="2" strokeLinejoin="round" />
-    <Path d="M9 12h6" stroke={color} strokeWidth="2" strokeLinecap="round" />
-  </Svg>
-);
+function TabIcon({ Icon, focused }: { Icon: React.FC<IC>; focused: boolean }) {
+  return (
+    <View style={tabStyles.item}>
+      {focused && <View style={tabStyles.activeDot} />}
+      <Icon color={focused ? '#84CC16' : 'rgba(255,255,255,0.45)'} size={24} />
+    </View>
+  );
+}
 
-const ListIcon = ({ color, size = 22 }: IC) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path d="M8 6h13" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M8 12h13" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M8 18h13" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M3 6h.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M3 12h.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    <Path d="M3 18h.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
-  </Svg>
-);
+const tabStyles = StyleSheet.create({
+  item: { alignItems: 'center', justifyContent: 'center', paddingTop: 0 },
+  activeDot: {
+    position: 'absolute', top: -4,
+    width: 20, height: 2, borderRadius: 999, backgroundColor: '#84CC16',
+  },
+});
 
-const TabIcon = ({ Icon, focused }: { Icon: React.FC<IC>; focused: boolean }) => (
-  <View style={focused ? { backgroundColor: '#84CC16', borderRadius: 999, padding: 8 } : { padding: 8 }}>
-    <Icon color={focused ? '#111827' : '#9CA3AF'} size={20} />
-  </View>
-);
+function GlassBackground() {
+  return (
+    <BlurView intensity={Platform.OS === 'ios' ? 60 : 80} tint="dark" style={StyleSheet.absoluteFill}>
+      <View style={glassStyles.overlay} />
+    </BlurView>
+  );
+}
+
+const glassStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Platform.OS === 'ios' ? 'rgba(17,24,39,0.6)' : 'rgba(17,24,39,0.92)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(132,204,22,0.18)',
+    borderTopColor: 'rgba(132,204,22,0.28)',
+  },
+});
 
 export default function PartnerLayout() {
   return (
     <Tabs
       screenOptions={{
         tabBarShowLabel: false,
+        tabBarBackground: () => <GlassBackground />,
         tabBarStyle: {
           position: 'absolute',
-          bottom: 28,
+          bottom: 12,
           left: 20,
           right: 20,
-          borderRadius: 999,
-          backgroundColor: '#111827',
+          borderRadius: 24,
+          backgroundColor: 'transparent',
           borderTopWidth: 0,
-          height: 70,
-          paddingBottom: 0,
-          paddingTop: 0,
-          elevation: 16,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.3,
+          height: 56,
+          elevation: 0,
+          shadowColor: '#0D2818',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.4,
           shadowRadius: 20,
         },
         headerStyle: { backgroundColor: '#FFFFFF', elevation: 0, shadowOpacity: 0 },
         headerTitleStyle: { fontSize: 17, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
         headerTintColor: '#111827',
         tabBarActiveTintColor: '#84CC16',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
+        tabBarItemStyle: { justifyContent: 'center', alignItems: 'center', paddingBottom: 0, paddingTop: 0 },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{ headerTitle: 'Partner Dashboard', tabBarIcon: ({ focused }) => <TabIcon Icon={GridIcon} focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="transactions"
-        options={{ headerTitle: 'Live Feed', tabBarIcon: ({ focused }) => <TabIcon Icon={ActivityIcon} focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="confirm"
-        options={{ headerTitle: 'Confirm Redemption', tabBarIcon: ({ focused }) => <TabIcon Icon={CheckCircleIcon} focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="availability"
-        options={{ headerTitle: 'Availability Settings', tabBarIcon: ({ focused }) => <TabIcon Icon={CalendarIcon} focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="bookings"
-        options={{ headerTitle: 'Reservations', tabBarIcon: ({ focused }) => <TabIcon Icon={ListIcon} focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="voucher"
-        options={{ headerTitle: 'Guest Voucher', tabBarIcon: ({ focused }) => <TabIcon Icon={TicketIcon} focused={focused} /> }}
-      />
+      <Tabs.Screen name="index"        options={{ headerTitle: 'Partner Dashboard', tabBarIcon: ({ focused }) => <TabIcon Icon={GridIcon}        focused={focused} /> }} />
+      <Tabs.Screen name="transactions" options={{ headerTitle: 'Live Feed',          tabBarIcon: ({ focused }) => <TabIcon Icon={ActivityIcon}   focused={focused} /> }} />
+      <Tabs.Screen name="confirm"      options={{ headerTitle: 'Confirm Redemption', tabBarIcon: ({ focused }) => <TabIcon Icon={CheckCircleIcon} focused={focused} /> }} />
+      <Tabs.Screen name="bookings"     options={{ href: null }} />
+      <Tabs.Screen name="voucher"      options={{ href: null }} />
+      <Tabs.Screen name="account"      options={{ headerTitle: 'Account',            tabBarIcon: ({ focused }) => <TabIcon Icon={PersonIcon}     focused={focused} /> }} />
     </Tabs>
   );
 }
